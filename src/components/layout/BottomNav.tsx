@@ -10,24 +10,36 @@ import {
   Briefcase,
   CreditCard,
   LogOut,
+  Users,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
+import type { UserRole } from "@/lib/session";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/catalogo", label: "Catálogo", icon: Gem },
-  { href: "/pdv", label: "PDV", icon: ShoppingBag },
-  { href: "/consignacao", label: "Maleta", icon: Briefcase },
-  { href: "/cobrancas", label: "Cobranças", icon: CreditCard },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
+  { href: "/catalogo", label: "Catálogo", icon: Gem, adminOnly: false },
+  { href: "/pdv", label: "PDV", icon: ShoppingBag, adminOnly: false },
+  { href: "/consignacao", label: "Maleta", icon: Briefcase, adminOnly: false },
+  { href: "/cobrancas", label: "Cobranças", icon: CreditCard, adminOnly: false },
+  { href: "/admin/usuarios", label: "Usuários", icon: Users, adminOnly: true },
 ];
 
-export function BottomNav() {
+interface BottomNavProps {
+  role: UserRole;
+}
+
+export function BottomNav({ role }: BottomNavProps) {
   const pathname = usePathname();
+  const isAdmin = role === "administrador";
+
+  const visibleItems = navItems.filter(
+    (item) => !item.adminOnly || isAdmin
+  );
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-stone-200 safe-area-inset-bottom">
       <div className="flex items-center justify-around px-2 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom,0px))]">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 

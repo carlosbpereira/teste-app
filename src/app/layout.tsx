@@ -4,6 +4,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
+import { getSessionUser, type UserRole } from "@/lib/session";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,17 +36,21 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Lê o role do usuário a partir do cookie de sessão (server-side)
+  const { role } = await getSessionUser();
+  const userRole: UserRole = role ?? "revendedor";
+
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body className="antialiased bg-stone-50 text-stone-900 min-h-dvh">
         <div className="flex min-h-dvh">
           {/* Desktop Sidebar */}
-          <Sidebar />
+          <Sidebar role={userRole} />
 
           {/* Main content */}
           <div className="flex-1 flex flex-col min-w-0">
@@ -60,7 +65,7 @@ export default function RootLayout({
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <BottomNav />
+        <BottomNav role={userRole} />
       </body>
     </html>
   );

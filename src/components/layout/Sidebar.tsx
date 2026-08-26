@@ -13,9 +13,11 @@ import {
   ChevronRight,
   Crown,
   LogOut,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 import { logout } from "@/app/actions/auth";
+import type { UserRole } from "@/lib/session";
 
 const navItems = [
   {
@@ -23,36 +25,57 @@ const navItems = [
     label: "Dashboard",
     icon: LayoutDashboard,
     description: "Visão geral",
+    adminOnly: false,
   },
   {
     href: "/catalogo",
     label: "Catálogo",
     icon: Gem,
     description: "Estoque e produtos",
+    adminOnly: false,
   },
   {
     href: "/pdv",
     label: "PDV",
     icon: ShoppingBag,
     description: "Nova venda",
+    adminOnly: false,
   },
   {
     href: "/consignacao",
     label: "Consignação",
     icon: Briefcase,
     description: "Maleta revendedora",
+    adminOnly: false,
   },
   {
     href: "/cobrancas",
     label: "Cobranças",
     icon: CreditCard,
     description: "Promissórias",
+    adminOnly: false,
+  },
+  {
+    href: "/admin/usuarios",
+    label: "Usuários",
+    icon: Users,
+    description: "Gestão de acesso",
+    adminOnly: true,
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  role: UserRole;
+}
+
+export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const isAdmin = role === "administrador";
+
+  const visibleItems = navItems.filter(
+    (item) => !item.adminOnly || isAdmin
+  );
 
   return (
     <aside
@@ -78,7 +101,7 @@ export function Sidebar() {
 
       {/* Nav Items */}
       <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
@@ -121,6 +144,22 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Role badge */}
+      {!collapsed && (
+        <div className="px-5 pb-2">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full",
+              isAdmin
+                ? "bg-gold-500/15 text-gold-400 border border-gold-500/25"
+                : "bg-stone-800 text-stone-400 border border-stone-700"
+            )}
+          >
+            {isAdmin ? "👑 Administrador" : "🔑 Revendedor"}
+          </span>
+        </div>
+      )}
 
       {/* Logout + Collapse */}
       <div className="p-3 border-t border-stone-800 space-y-1">

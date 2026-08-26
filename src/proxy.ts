@@ -1,29 +1,95 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Routes that don't require authentication
-const publicRoutes = ["/login", "/cadastro"];
+// Rotas que não exigem autenticação
+const PUBLIC_ROUTES = ["/login"];
 
-export default async function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+// Rotas de API públicas (sem autenticação)
+const PUBLIC_API_ROUTES = ["/api/public"];
 
-  const isPublicRoute = publicRoutes.some(
+// Rotas exclusivas para administradores
+const ADMIN_ONLY_ROUTES = ["/admin"];
+
+export default function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Ignorar arquivos estáticos e internals do Next.js
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/manifest") ||
+    pathname.includes(".")
+  ) {
+    return NextResponse.next();
+  }
+
+  const accessToken = request.cookies.get("sb-access-token")?.value;
+  const userRole = request.cookies.get("sb-user-role")?.value;
+
+  // ─── Rota de cadastro público — bloqueada para todos ───────────────────────
+  if (pathname.startsWith("/cadastro")) {
+    // Se não autenticado → login
+    if (!accessToken) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    // Se autenticado mas não admin → home
+    if (userRole !== "administrador") {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    // Admin → redireciona para painel interno
+    return NextResponse.redirect(new URL("/admin/usuarios", request.url));
+  }
+
+  // ─── Rotas públicas (login) ─────────────────────────────────────────────────
+  const isPublicRoute = PUBLIC_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(route + "/")
   );
 
-  // Read the access token from the HttpOnly cookie
-  const accessToken = req.cookies.get("sb-access-token")?.value;
-  const isAuthenticated = Boolean(accessToken);
+  if (isPublicRoute) {
+    // Se já autenticado, redireciona para home
+    if (accessToken) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return NextResponse.next();
+  }
 
-  // If on a protected route without a session → redirect to /login
-  if (!isPublicRoute && !isAuthenticated) {
-    const loginUrl = new URL("/login", req.nextUrl);
-    loginUrl.searchParams.set("from", pathname);
+  // ─── Rotas de API ───────────────────────────────────────────────────────────
+  if (pathname.startsWith("/api/")) {
+    const isPublicApi = PUBLIC_API_ROUTES.some((route) =>
+      pathname.startsWith(route)
+    );
+
+    if (!isPublicApi && !accessToken) {
+      return NextResponse.json(
+        { error: "Não autorizado. Faça login para continuar." },
+        { status: 401 }
+      );
+    }
+
+    // Rotas de API admin exigem role administrador
+    if (pathname.startsWith("/api/admin/") && userRole !== "administrador") {
+      return NextResponse.json(
+        { error: "Acesso negado. Apenas administradores." },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.next();
+  }
+
+  // ─── Proteção geral: exige token ────────────────────────────────────────────
+  if (!accessToken) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // If already authenticated and trying to access auth pages → redirect to home
-  if (isPublicRoute && isAuthenticated) {
-    return NextResponse.redirect(new URL("/", req.nextUrl));
+  // ─── Rotas exclusivas para administradores ──────────────────────────────────
+  const isAdminRoute = ADMIN_ONLY_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(route + "/")
+  );
+
+  if (isAdminRoute && userRole !== "administrador") {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();

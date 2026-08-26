@@ -1,268 +1,43 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { signup, type AuthState } from "@/app/actions/auth";
-import Link from "next/link";
-import {
-  Crown,
-  Mail,
-  Lock,
-  User,
-  Eye,
-  EyeOff,
-  UserPlus,
-  Loader2,
-} from "lucide-react";
-import { Suspense } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Crown, Lock } from "lucide-react";
 
-function SignupForm() {
-  const [state, action, isPending] = useActionState<AuthState, FormData>(
-    signup,
-    null
-  );
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+/**
+ * A rota /cadastro é bloqueada pelo middleware para todos os usuários:
+ * - Não autenticados → redirect para /login (middleware)
+ * - Autenticados sem role admin → redirect para / (middleware)
+ * - Autenticados com role admin → redirect para /admin/usuarios (middleware)
+ *
+ * Esta página serve apenas como fallback visual por segurança.
+ */
+export default function CadastroPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/login");
+  }, [router]);
 
   return (
-    <div className="min-h-dvh flex items-center justify-center relative overflow-hidden bg-stone-950">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-gold-500/5 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-gold-500/8 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-gold-500/3 blur-3xl" />
+    <div className="min-h-dvh flex items-center justify-center bg-stone-950">
+      <div className="flex flex-col items-center gap-4 text-center px-4">
         <div
-          className="absolute inset-0 opacity-[0.03]"
+          className="w-14 h-14 rounded-2xl flex items-center justify-center"
           style={{
-            backgroundImage:
-              "linear-gradient(#c9a84c 1px, transparent 1px), linear-gradient(90deg, #c9a84c 1px, transparent 1px)",
-            backgroundSize: "60px 60px",
-          }}
-        />
-      </div>
-
-      {/* Card */}
-      <div className="relative w-full max-w-md mx-4 my-8 animate-fade-in">
-        <div
-          className="rounded-3xl p-8 border border-stone-800"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(28,25,23,0.95) 0%, rgba(21,18,16,0.98) 100%)",
-            boxShadow:
-              "0 0 0 1px rgba(201,168,76,0.08), 0 40px 80px rgba(0,0,0,0.6), 0 0 60px rgba(201,168,76,0.05)",
+            background: "linear-gradient(135deg, #c9a84c 0%, #e8d5a3 50%, #c9a84c 100%)",
           }}
         >
-          {/* Logo */}
-          <div className="flex flex-col items-center mb-8">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-gold"
-              style={{
-                background:
-                  "linear-gradient(135deg, #c9a84c 0%, #e8d5a3 50%, #c9a84c 100%)",
-              }}
-            >
-              <Crown className="w-7 h-7 text-stone-900" />
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">
-              Criar Conta
-            </h1>
-            <p className="text-stone-400 text-sm mt-1">
-              Labela Semijoias · ERP & PDV
-            </p>
-          </div>
-
-          {/* Error */}
-          {state?.error && (
-            <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
-              {state.error}
-            </div>
-          )}
-
-          {/* Form */}
-          <form action={action} className="space-y-4">
-            {/* Name */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="name"
-                className="text-xs font-semibold text-stone-400 uppercase tracking-wider"
-              >
-                Nome completo
-              </label>
-              <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500 pointer-events-none" />
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  autoComplete="name"
-                  placeholder="Seu nome"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-stone-600
-                    bg-stone-900/80 border border-stone-700/50
-                    focus:outline-none focus:border-gold-500/60 focus:bg-stone-900
-                    transition-all duration-200"
-                />
-              </div>
-            </div>
-
-            {/* Email */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="email"
-                className="text-xs font-semibold text-stone-400 uppercase tracking-wider"
-              >
-                E-mail
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500 pointer-events-none" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="seu@email.com"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder-stone-600
-                    bg-stone-900/80 border border-stone-700/50
-                    focus:outline-none focus:border-gold-500/60 focus:bg-stone-900
-                    transition-all duration-200"
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="password"
-                className="text-xs font-semibold text-stone-400 uppercase tracking-wider"
-              >
-                Senha
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500 pointer-events-none" />
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  autoComplete="new-password"
-                  placeholder="Mínimo 6 caracteres"
-                  className="w-full pl-10 pr-12 py-3 rounded-xl text-sm text-white placeholder-stone-600
-                    bg-stone-900/80 border border-stone-700/50
-                    focus:outline-none focus:border-gold-500/60 focus:bg-stone-900
-                    transition-all duration-200"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 transition-colors"
-                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Confirm Password */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="confirmPassword"
-                className="text-xs font-semibold text-stone-400 uppercase tracking-wider"
-              >
-                Confirmar senha
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500 pointer-events-none" />
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirm ? "text" : "password"}
-                  required
-                  autoComplete="new-password"
-                  placeholder="Repita a senha"
-                  className="w-full pl-10 pr-12 py-3 rounded-xl text-sm text-white placeholder-stone-600
-                    bg-stone-900/80 border border-stone-700/50
-                    focus:outline-none focus:border-gold-500/60 focus:bg-stone-900
-                    transition-all duration-200"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 transition-colors"
-                  aria-label={showConfirm ? "Ocultar senha" : "Mostrar senha"}
-                >
-                  {showConfirm ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Submit button */}
-            <button
-              type="submit"
-              disabled={isPending}
-              id="btn-cadastro"
-              className="w-full flex items-center justify-center gap-2 py-3.5 px-6 mt-2 rounded-xl
-                font-semibold text-sm text-stone-900
-                transition-all duration-200
-                disabled:opacity-60 disabled:cursor-not-allowed
-                hover:shadow-gold-lg active:scale-[0.98]"
-              style={{
-                background:
-                  "linear-gradient(135deg, #c9a84c 0%, #e8d5a3 50%, #c9a84c 100%)",
-                boxShadow: isPending
-                  ? "none"
-                  : "0 4px 24px rgba(201,168,76,0.35)",
-              }}
-            >
-              {isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <UserPlus className="w-4 h-4" />
-              )}
-              {isPending ? "Criando conta..." : "Criar conta"}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-stone-800" />
-            <span className="text-stone-600 text-xs">ou</span>
-            <div className="flex-1 h-px bg-stone-800" />
-          </div>
-
-          {/* Link to login */}
-          <p className="text-center text-sm text-stone-500">
-            Já tem uma conta?{" "}
-            <Link
-              href="/login"
-              id="link-login"
-              className="text-gold-400 font-semibold hover:text-gold-300 transition-colors"
-            >
-              Entrar
-            </Link>
+          <Crown className="w-7 h-7 text-stone-900" />
+        </div>
+        <Lock className="w-8 h-8 text-stone-500" />
+        <div>
+          <h1 className="text-white font-bold text-lg">Acesso Restrito</h1>
+          <p className="text-stone-400 text-sm mt-1">
+            O cadastro de novos usuários é realizado internamente pelos administradores.
           </p>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-stone-700 text-xs mt-6">
-          © {new Date().getFullYear()} Labela Semijoias · Todos os direitos reservados
-        </p>
       </div>
     </div>
-  );
-}
-
-export default function CadastroPage() {
-  return (
-    <Suspense>
-      <SignupForm />
-    </Suspense>
   );
 }

@@ -1,9 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { login, type AuthState } from "@/app/actions/auth";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Crown, Mail, Lock, LogIn, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Suspense } from "react";
 
@@ -13,8 +11,6 @@ function LoginForm() {
     null
   );
   const [showPassword, setShowPassword] = useState(false);
-  const searchParams = useSearchParams();
-  const justRegistered = searchParams.get("registered") === "1";
 
   return (
     <div className="min-h-dvh flex items-center justify-center relative overflow-hidden bg-stone-950">
@@ -64,12 +60,7 @@ function LoginForm() {
             </p>
           </div>
 
-          {/* Success message after registration */}
-          {justRegistered && (
-            <div className="mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm text-center">
-              Conta criada! Verifique seu e-mail ou faça login abaixo.
-            </div>
-          )}
+
 
           {/* Error */}
           {state?.error && (
@@ -169,24 +160,7 @@ function LoginForm() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-stone-800" />
-            <span className="text-stone-600 text-xs">ou</span>
-            <div className="flex-1 h-px bg-stone-800" />
-          </div>
 
-          {/* Link to signup */}
-          <p className="text-center text-sm text-stone-500">
-            Ainda não tem acesso?{" "}
-            <Link
-              href="/cadastro"
-              id="link-cadastro"
-              className="text-gold-400 font-semibold hover:text-gold-300 transition-colors"
-            >
-              Criar conta
-            </Link>
-          </p>
         </div>
 
         {/* Footer */}
