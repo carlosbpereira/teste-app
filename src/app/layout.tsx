@@ -41,31 +41,36 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Lê o role do usuário a partir do cookie de sessão (server-side)
-  const { role } = await getSessionUser();
+  // Lê os dados de sessão do cookie (server-side)
+  const { role, accessToken } = await getSessionUser();
+  const isAuthenticated = Boolean(accessToken && role);
   const userRole: UserRole = role ?? "revendedor";
 
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body className="antialiased bg-stone-50 text-stone-900 min-h-dvh">
-        <div className="flex min-h-dvh">
-          {/* Desktop Sidebar */}
-          <Sidebar role={userRole} />
+        {isAuthenticated ? (
+          <div className="flex min-h-dvh">
+            {/* Desktop Sidebar */}
+            <Sidebar role={userRole} />
 
-          {/* Main content */}
-          <div className="flex-1 flex flex-col min-w-0">
-            {/* Mobile Header */}
-            <Header />
+            {/* Main content */}
+            <div className="flex-1 flex flex-col min-w-0">
+              {/* Mobile Header */}
+              <Header />
 
-            {/* Page content */}
-            <main className="flex-1 overflow-x-hidden pb-20 lg:pb-0">
-              {children}
-            </main>
+              {/* Page content */}
+              <main className="flex-1 overflow-x-hidden pb-20 lg:pb-0">
+                {children}
+              </main>
+            </div>
+
+            {/* Mobile Bottom Navigation */}
+            <BottomNav role={userRole} />
           </div>
-        </div>
-
-        {/* Mobile Bottom Navigation */}
-        <BottomNav role={userRole} />
+        ) : (
+          <main className="min-h-dvh flex flex-col">{children}</main>
+        )}
       </body>
     </html>
   );

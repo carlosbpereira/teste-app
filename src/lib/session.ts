@@ -41,12 +41,25 @@ export async function createSession(
 
 export async function deleteSession(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(ACCESS_TOKEN_COOKIE);
-  cookieStore.delete(REFRESH_TOKEN_COOKIE);
-  cookieStore.delete(USER_ROLE_COOKIE);
-  cookieStore.delete(USER_ID_COOKIE);
-  cookieStore.delete(USER_NAME_COOKIE);
-  cookieStore.delete(USER_PHONE_COOKIE);
+  const allCookies = [
+    ACCESS_TOKEN_COOKIE,
+    REFRESH_TOKEN_COOKIE,
+    USER_ROLE_COOKIE,
+    USER_ID_COOKIE,
+    USER_NAME_COOKIE,
+    USER_PHONE_COOKIE,
+  ];
+
+  for (const c of allCookies) {
+    cookieStore.delete(c);
+    cookieStore.set(c, "", {
+      path: "/",
+      maxAge: 0,
+      expires: new Date(0),
+      httpOnly: true,
+      sameSite: "lax",
+    });
+  }
 }
 
 export async function getSession(): Promise<{
