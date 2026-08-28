@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, isGuardError } from "@/lib/auth-guard";
 
 export async function POST(req: NextRequest) {
+  // ── Guard ──────────────────────────────────────────────
+  const auth = await requireAuth();
+  if (isGuardError(auth)) return auth;
+  const { role, userId } = auth;
+  // ──────────────────────────────────────────────────────
+
   try {
     const body = await req.json();
     const {
@@ -17,6 +24,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Dados incompletos para criar a venda" },
         { status: 400 }
+      );
+    }
+
+    // Revendedora só pode registrar como REVENDEDORA
+    if (role === "revendedor" && vendedoraTipo !== "REVENDEDORA") {
+      return NextResponse.json(
+        { error: "Revendedoras só podem registrar vendas do tipo REVENDEDORA." },
+        { status: 403 }
       );
     }
 
@@ -42,22 +57,40 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Revendedora só pode vender peças alocadas para ela
+    if (role === "revendedor") {
+      const naoAutorizados = produtos.filter(
+        (p) => p.revendedoraId !== userId
+      );
+      if (naoAutorizados.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Produto(s) não alocado(s) para você: ${naoAutorizados.map((p) => p.nome).join(", ")}`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Transação atômica
     const venda = await prisma.$transaction(async (tx) => {
-      // Criar venda
+      // Criar venda — salvar vendedoraId para revendedoras
       const novaVenda = await tx.venda.create({
         data: {
           clienteId,
           vendedoraTipo,
+          vendedoraId: role === "revendedor" ? userId : null,
           valorTotal,
           desconto,
           valorFinal,
           formaPagamento,
           itens: {
-            create: itens.map((item: { produtoId: string; precoUnitario: number }) => ({
-              produtoId: item.produtoId,
-              precoUnitario: item.precoUnitario,
-            })),
+            create: itens.map(
+              (item: { produtoId: string; precoUnitario: number }) => ({
+                produtoId: item.produtoId,
+                precoUnitario: item.precoUnitario,
+              })
+            ),
           },
         },
         include: {
@@ -98,11 +131,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(venda, { status: 201 });
   } catch (error) {
     console.error("Erro ao criar venda:", error);
-    return NextResponse.json({ error: "Erro interno ao processar venda" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erro interno ao processar venda" },
+      { status: 500 }
+    );
   }
 }
 
 export async function GET(req: NextRequest) {
+  // ── Guard ──────────────────────────────────────────────
+  const auth = await requireAuth();
+  if (isGuardError(auth)) return auth;
+  const { role, userId } = auth;
+  // ──────────────────────────────────────────────────────
+
   try {
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "100");
@@ -112,7 +154,17 @@ export async function GET(req: NextRequest) {
     const dataFim = searchParams.get("dataFim");
 
     const where: Record<string, unknown> = {};
-    if (vendedoraTipo) where.vendedoraTipo = vendedoraTipo;
+
+    // ── RBAC Scoping ──────────────────────────────────────
+    if (role === "revendedor") {
+      // Revendedora só vê suas próprias vendas
+      where.vendedoraId = userId;
+    } else {
+      // Admin pode filtrar por tipo de vendedora
+      if (vendedoraTipo) where.vendedoraTipo = vendedoraTipo;
+    }
+    // ─────────────────────────────────────────────────────
+
     if (dataInicio || dataFim) {
       where.criadoEm = {
         ...(dataInicio ? { gte: new Date(dataInicio + "T00:00:00") } : {}),

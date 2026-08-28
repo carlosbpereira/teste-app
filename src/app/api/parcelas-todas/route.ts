@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, isGuardError } from "@/lib/auth-guard";
 
 export async function GET(req: NextRequest) {
+  // ── Guard ──────────────────────────────────────────────
+  const auth = await requireAuth();
+  if (isGuardError(auth)) return auth;
+  const { role, userId } = auth;
+  // ──────────────────────────────────────────────────────
+
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
@@ -10,6 +17,13 @@ export async function GET(req: NextRequest) {
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (clienteId) where.clienteId = clienteId;
+
+    // ── RBAC Scoping ──────────────────────────────────────
+    // Revendedora só vê parcelas das suas próprias vendas
+    if (role === "revendedor") {
+      where.venda = { vendedoraId: userId };
+    }
+    // ─────────────────────────────────────────────────────
 
     const parcelas = await prisma.parcelaPromissoria.findMany({
       where,

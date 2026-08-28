@@ -9,6 +9,7 @@ import {
   Package,
   AlertCircle,
   Crown,
+  Star,
   MessageCircle,
   ChevronRight,
   ArrowUpRight,
@@ -24,10 +25,11 @@ interface DashboardData {
   pecasVendidasMes: number;
   totalEstoque: number;
   totalPromissorias: number;
-  vendasDona: number;
-  vendasRevendedora: number;
-  percentualDona: number;
-  percentualRevendedora: number;
+  // Campos exclusivos do admin
+  vendasDona?: number;
+  vendasRevendedora?: number;
+  percentualDona?: number;
+  percentualRevendedora?: number;
   parcelasAlerta: Array<{
     id: string;
     clienteNome: string;
@@ -39,14 +41,25 @@ interface DashboardData {
   }>;
 }
 
+interface MeData {
+  role: "administrador" | "revendedor";
+  userId: string;
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [me, setMe] = useState<MeData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard")
-      .then((r) => r.json())
-      .then(setData)
+    Promise.all([
+      fetch("/api/dashboard").then((r) => r.json()),
+      fetch("/api/me").then((r) => r.json()),
+    ])
+      .then(([dashData, meData]) => {
+        setData(dashData);
+        setMe(meData);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -58,6 +71,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const isAdmin = me?.role === "administrador";
 
   const hoje = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
@@ -72,18 +87,25 @@ export default function DashboardPage() {
         <div>
           <p className="text-sm text-stone-400 capitalize">{hoje}</p>
           <h1 className="text-2xl lg:text-3xl font-bold text-stone-800 mt-0.5">
-            Bom dia, Labela! 👑
+            {isAdmin ? "Bom dia, Labela! 👑" : "Bom dia! 👋"}
           </h1>
+          {!isAdmin && (
+            <p className="text-xs text-stone-400 mt-0.5">Minhas vendas do mês</p>
+          )}
         </div>
         <div className="w-12 h-12 rounded-2xl gold-gradient flex items-center justify-center shadow-gold">
-          <Crown className="w-6 h-6 text-white" />
+          {isAdmin ? (
+            <Crown className="w-6 h-6 text-white" />
+          ) : (
+            <Star className="w-6 h-6 text-white" />
+          )}
         </div>
       </div>
 
       {/* KPI Cards */}
       <section aria-label="Indicadores do mês">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-400 mb-3">
-          Resumo do Mês
+          {isAdmin ? "Resumo do Mês" : "Meu Resumo do Mês"}
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <KpiCard
@@ -100,7 +122,7 @@ export default function DashboardPage() {
             subtitle="no mês atual"
           />
           <KpiCard
-            title="Em Estoque"
+            title={isAdmin ? "Em Estoque" : "Minha Maleta"}
             value={String(data?.totalEstoque ?? 0)}
             icon={Package}
             subtitle="peças disponíveis"
@@ -115,68 +137,72 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Vendas: Dona vs Revendedora */}
-      <section
-        className="bg-white rounded-2xl p-5 border border-stone-100 shadow-sm"
-        aria-label="Divisão de vendas"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-stone-800">Divisão de Vendas</h2>
-          <span className="text-xs text-stone-400">
-            {(data?.vendasDona ?? 0) + (data?.vendasRevendedora ?? 0)} vendas totais
-          </span>
-        </div>
+      {/* Divisão de Vendas — apenas para admin */}
+      {isAdmin &&
+        data?.vendasDona !== undefined &&
+        data?.vendasRevendedora !== undefined && (
+          <section
+            className="bg-white rounded-2xl p-5 border border-stone-100 shadow-sm"
+            aria-label="Divisão de vendas"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-stone-800">Divisão de Vendas</h2>
+              <span className="text-xs text-stone-400">
+                {(data.vendasDona ?? 0) + (data.vendasRevendedora ?? 0)} vendas totais
+              </span>
+            </div>
 
-        <div className="space-y-3">
-          {/* Dona */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-gold-500" />
-                <span className="text-sm font-medium text-stone-700">Dona</span>
+            <div className="space-y-3">
+              {/* Dona */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-gold-500" />
+                    <span className="text-sm font-medium text-stone-700">Dona</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-stone-800">
+                      {data?.percentualDona ?? 0}%
+                    </span>
+                    <span className="text-xs text-stone-400 ml-1">
+                      ({data?.vendasDona ?? 0} vendas)
+                    </span>
+                  </div>
+                </div>
+                <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full gold-gradient rounded-full transition-all duration-700"
+                    style={{ width: `${data?.percentualDona ?? 0}%` }}
+                  />
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-stone-800">
-                  {data?.percentualDona ?? 0}%
-                </span>
-                <span className="text-xs text-stone-400 ml-1">
-                  ({data?.vendasDona ?? 0} vendas)
-                </span>
-              </div>
-            </div>
-            <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden">
-              <div
-                className="h-full gold-gradient rounded-full transition-all duration-700"
-                style={{ width: `${data?.percentualDona ?? 0}%` }}
-              />
-            </div>
-          </div>
 
-          {/* Revendedora */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                <span className="text-sm font-medium text-stone-700">Revendedora</span>
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-stone-800">
-                  {data?.percentualRevendedora ?? 0}%
-                </span>
-                <span className="text-xs text-stone-400 ml-1">
-                  ({data?.vendasRevendedora ?? 0} vendas)
-                </span>
+              {/* Revendedora */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+                    <span className="text-sm font-medium text-stone-700">Revendedora</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-stone-800">
+                      {data?.percentualRevendedora ?? 0}%
+                    </span>
+                    <span className="text-xs text-stone-400 ml-1">
+                      ({data?.vendasRevendedora ?? 0} vendas)
+                    </span>
+                  </div>
+                </div>
+                <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-400 rounded-full transition-all duration-700"
+                    style={{ width: `${data?.percentualRevendedora ?? 0}%` }}
+                  />
+                </div>
               </div>
             </div>
-            <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-purple-400 rounded-full transition-all duration-700"
-                style={{ width: `${data?.percentualRevendedora ?? 0}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
+          </section>
+        )}
 
       {/* Alertas de Promissórias */}
       {(data?.parcelasAlerta?.length ?? 0) > 0 && (
@@ -277,8 +303,12 @@ export default function DashboardPage() {
               <Package className="w-5 h-5 text-gold-600" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-sm text-stone-800">Catálogo</p>
-              <p className="text-xs text-stone-400">Gerenciar estoque</p>
+              <p className="font-semibold text-sm text-stone-800">
+                {isAdmin ? "Catálogo" : "Minha Maleta"}
+              </p>
+              <p className="text-xs text-stone-400">
+                {isAdmin ? "Gerenciar estoque" : "Ver peças disponíveis"}
+              </p>
             </div>
             <ArrowUpRight className="w-4 h-4 text-stone-300 group-hover:text-gold-500 transition-colors" />
           </Link>

@@ -73,6 +73,9 @@ export default function CatalogoPage() {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Role do usuário logado
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
   // Filtros
   const [search, setSearch] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("");
@@ -86,7 +89,8 @@ export default function CatalogoPage() {
       if (search) params.set("q", search);
       if (filterCategoria) params.set("categoria", filterCategoria);
       if (filterStatus) params.set("status", filterStatus);
-      if (filterLocalizacao) params.set("localizacao", filterLocalizacao);
+      // Revendedora: backend ignora esse parâmetro e sempre retorna só as dela
+      if (filterLocalizacao && isAdmin) params.set("localizacao", filterLocalizacao);
 
       const res = await fetch(`/api/produtos?${params}`);
       const data = await res.json();
@@ -96,12 +100,21 @@ export default function CatalogoPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterCategoria, filterStatus, filterLocalizacao]);
+  }, [search, filterCategoria, filterStatus, filterLocalizacao, isAdmin]);
+
+  // Buscar role do usuário
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => setIsAdmin(d.role === "administrador"))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   useEffect(() => {
+    if (isAdmin === null) return; // aguarda o role ser carregado
     const timer = setTimeout(fetchProdutos, 300);
     return () => clearTimeout(timer);
-  }, [fetchProdutos]);
+  }, [fetchProdutos, isAdmin]);
 
   const openCreate = () => {
     setEditingProduto(null);
@@ -195,6 +208,20 @@ export default function CatalogoPage() {
     }
   };
 
+  const handleDevolverPeca = async (produto: Produto) => {
+    if (!confirm(`Devolver "${produto.nome}" para o estoque da Dona?`)) return;
+    try {
+      await fetch(`/api/produtos/${produto.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "devolver-peca" }),
+      });
+      fetchProdutos();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleTransferirCustodia = async (produto: Produto) => {
     try {
       await fetch(`/api/produtos/${produto.id}`, {
@@ -231,19 +258,25 @@ export default function CatalogoPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">Catálogo & Estoque</h1>
+          <h1 className="text-2xl font-bold text-stone-800">
+            {isAdmin ? "Catálogo & Estoque" : "Minha Maleta"}
+          </h1>
           <p className="text-sm text-stone-400 mt-0.5">
-            {produtos.length} {produtos.length === 1 ? "peça" : "peças"} encontradas
+            {produtos.length} {produtos.length === 1 ? "peça" : "peças"}{" "}
+            {isAdmin ? "encontradas" : "alocadas para você"}
           </p>
         </div>
-        <button
-          id="btn-novo-produto"
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 gold-gradient text-white rounded-xl font-semibold text-sm shadow-gold hover:shadow-gold-lg transition-all hover:scale-105"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nova Peça</span>
-        </button>
+        {/* Botão Nova Peça apenas para admin */}
+        {isAdmin && (
+          <button
+            id="btn-novo-produto"
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2.5 gold-gradient text-white rounded-xl font-semibold text-sm shadow-gold hover:shadow-gold-lg transition-all hover:scale-105"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nova Peça</span>
+          </button>
+        )}
       </div>
 
       {/* Category chips */}
@@ -305,15 +338,18 @@ export default function CatalogoPage() {
           <option value="RESERVADO">Reservado</option>
           <option value="VENDIDO">Vendido</option>
         </select>
-        <select
-          value={filterLocalizacao}
-          onChange={(e) => setFilterLocalizacao(e.target.value)}
-          className="hidden sm:block px-3 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-600 focus:outline-none focus:border-gold-400 transition-all"
-        >
-          <option value="">Local</option>
-          <option value="DONA">Com a Dona</option>
-          <option value="REVENDEDORA">Com Revendedora</option>
-        </select>
+        {/* Filtro de localização apenas para admin (revendedora só vê as suas) */}
+        {isAdmin && (
+          <select
+            value={filterLocalizacao}
+            onChange={(e) => setFilterLocalizacao(e.target.value)}
+            className="hidden sm:block px-3 py-2.5 bg-white border border-stone-200 rounded-xl text-sm text-stone-600 focus:outline-none focus:border-gold-400 transition-all"
+          >
+            <option value="">Local</option>
+            <option value="DONA">Com a Dona</option>
+            <option value="REVENDEDORA">Com Revendedora</option>
+          </select>
+        )}
       </div>
 
       {/* Products Grid */}
@@ -365,23 +401,25 @@ export default function CatalogoPage() {
                   <StatusBadge status={produto.status} />
                 </div>
 
-                {/* Quick actions */}
-                <div className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => openEdit(produto)}
-                    className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-gold-50 transition-colors"
-                    title="Editar"
-                  >
-                    <Edit2 className="w-4 h-4 text-stone-700" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(produto)}
-                    className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-red-50 transition-colors"
-                    title="Excluir"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </button>
-                </div>
+                {/* Quick actions — apenas para admin */}
+                {isAdmin && (
+                  <div className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => openEdit(produto)}
+                      className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-gold-50 transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-4 h-4 text-stone-700" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(produto)}
+                      className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-red-50 transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Info */}
@@ -400,14 +438,25 @@ export default function CatalogoPage() {
                     </p>
                   </div>
                   {produto.status !== "VENDIDO" && (
-                    <button
-                      onClick={() => handleTransferirCustodia(produto)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg border border-stone-200 text-stone-500 hover:border-gold-300 hover:text-gold-600 transition-all text-[10px] font-medium"
-                      title="Transferir custódia"
-                    >
-                      <ArrowLeftRight className="w-3 h-3" />
-                      <span className="hidden sm:inline">Transferir</span>
-                    </button>
+                    isAdmin ? (
+                      <button
+                        onClick={() => handleTransferirCustodia(produto)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg border border-stone-200 text-stone-500 hover:border-gold-300 hover:text-gold-600 transition-all text-[10px] font-medium"
+                        title="Transferir custódia"
+                      >
+                        <ArrowLeftRight className="w-3 h-3" />
+                        <span className="hidden sm:inline">Transferir</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleDevolverPeca(produto)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg border border-amber-200 text-amber-600 hover:border-amber-400 hover:bg-amber-50 transition-all text-[10px] font-medium"
+                        title="Devolver à Dona"
+                      >
+                        <ArrowLeftRight className="w-3 h-3" />
+                        <span className="hidden sm:inline">Devolver</span>
+                      </button>
+                    )
                   )}
                 </div>
               </div>

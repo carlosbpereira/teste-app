@@ -70,7 +70,12 @@ export async function login(
   const role: UserRole =
     rawRole === "administrador" ? "administrador" : "revendedor";
 
-  await createSession(data.session.access_token, data.session.refresh_token, role);
+  await createSession(
+    data.session.access_token,
+    data.session.refresh_token,
+    role,
+    data.user.id   // ← userId do Supabase Auth
+  );
   redirect("/");
 }
 

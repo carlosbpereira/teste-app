@@ -48,6 +48,7 @@ export default function CobrancasPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>("TODAS");
   const [search, setSearch] = useState("");
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   // Baixa modal
   const [baixaModalOpen, setBaixaModalOpen] = useState(false);
@@ -86,6 +87,10 @@ export default function CobrancasPage() {
 
   useEffect(() => {
     fetchParcelas();
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => setIsAdmin(d.role === "administrador"))
+      .catch(() => setIsAdmin(false));
   }, [fetchParcelas]);
 
   const filteredParcelas = parcelas.filter((p) => {
@@ -149,8 +154,14 @@ export default function CobrancasPage() {
     <div className="p-4 lg:p-8 max-w-4xl mx-auto animate-fade-in">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-stone-800">Cobranças & Promissórias</h1>
-        <p className="text-sm text-stone-400 mt-0.5">Gestão de pagamentos parcelados</p>
+        <h1 className="text-2xl font-bold text-stone-800">
+          {isAdmin ? "Cobranças & Promissórias" : "Minhas Cobranças"}
+        </h1>
+        <p className="text-sm text-stone-400 mt-0.5">
+          {isAdmin
+            ? "Gestão de pagamentos parcelados"
+            : "Promissórias das minhas vendas"}
+        </p>
       </div>
 
       {/* Stats cards */}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireAdmin, isGuardError } from "@/lib/auth-guard";
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -16,8 +17,13 @@ function getAdminSupabase() {
 }
 
 // GET /api/admin/usuarios — lista todos os usuários
-// Protegido pelo middleware (exige role=administrador)
+// Protegido: exige role=administrador (HTTP 403 caso contrário)
 export async function GET() {
+  // ── Guard ──────────────────────────────────────────────
+  const guard = await requireAdmin();
+  if (isGuardError(guard)) return guard;
+  // ──────────────────────────────────────────────────────
+
   try {
     const adminSupabase = getAdminSupabase();
 

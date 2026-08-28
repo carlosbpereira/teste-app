@@ -43,6 +43,7 @@ export default function ConsignacaoPage() {
   const [activeTab, setActiveTab] = useState<"maleta" | "acerto">("maleta");
   const [maleta, setMaleta] = useState<Produto[]>([]);
   const [loadingMaleta, setLoadingMaleta] = useState(true);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   // Acerto
   const [dataInicio, setDataInicio] = useState(() => {
@@ -60,6 +61,7 @@ export default function ConsignacaoPage() {
   const fetchMaleta = useCallback(async () => {
     setLoadingMaleta(true);
     try {
+      // Backend já escopeia por revendedoraId se for revendedora
       const res = await fetch("/api/produtos?localizacao=REVENDEDORA");
       setMaleta(await res.json());
     } finally {
@@ -69,14 +71,19 @@ export default function ConsignacaoPage() {
 
   useEffect(() => {
     fetchMaleta();
+    // Buscar role
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => setIsAdmin(d.role === "administrador"))
+      .catch(() => setIsAdmin(false));
   }, [fetchMaleta]);
 
-  const handleTransferirCustodia = async (produto: Produto) => {
+  const handleDevolverPeca = async (produto: Produto) => {
     try {
       await fetch(`/api/produtos/${produto.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "transferir-custodia" }),
+        body: JSON.stringify({ action: "devolver-peca" }),
       });
       fetchMaleta();
     } catch (error) {
@@ -158,7 +165,7 @@ export default function ConsignacaoPage() {
           }`}
         >
           <Calculator className="w-4 h-4" />
-          Acerto do Mês
+          {isAdmin ? "Acerto do Mês" : "Meu Acerto do Mês"}
         </button>
       </div>
 
@@ -232,12 +239,12 @@ export default function ConsignacaoPage() {
                   {/* Action: devolver à dona */}
                   {produto.status !== "VENDIDO" && (
                     <button
-                      onClick={() => handleTransferirCustodia(produto)}
-                      className="flex-shrink-0 flex flex-col items-center gap-1 px-3 py-2 rounded-xl border border-stone-200 hover:border-gold-300 hover:bg-gold-50 transition-all"
+                      onClick={() => handleDevolverPeca(produto)}
+                      className="flex-shrink-0 flex flex-col items-center gap-1 px-3 py-2 rounded-xl border border-amber-200 hover:border-amber-400 hover:bg-amber-50 transition-all"
                       title="Devolver à Dona"
                     >
-                      <ArrowLeftRight className="w-4 h-4 text-stone-500" />
-                      <span className="text-[10px] text-stone-400 font-medium">Devolver</span>
+                      <ArrowLeftRight className="w-4 h-4 text-amber-500" />
+                      <span className="text-[10px] text-amber-500 font-medium">Devolver</span>
                     </button>
                   )}
                 </div>
@@ -309,32 +316,35 @@ export default function ConsignacaoPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1.5">
-                  Nome da Revendedora
-                </label>
-                <input
-                  type="text"
-                  value={revendedoraNome}
-                  onChange={(e) => setRevendedoraNome(e.target.value)}
-                  placeholder="Ex: Maria"
-                  className="w-full px-3 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
-                />
+            {/* Campos de nome/telefone apenas para admin (para gerar resumo por revendedora) */}
+            {isAdmin && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">
+                    Nome da Revendedora
+                  </label>
+                  <input
+                    type="text"
+                    value={revendedoraNome}
+                    onChange={(e) => setRevendedoraNome(e.target.value)}
+                    placeholder="Ex: Maria"
+                    className="w-full px-3 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">
+                    WhatsApp da Revendedora
+                  </label>
+                  <input
+                    type="tel"
+                    value={revendedoraTelefone}
+                    onChange={(e) => setRevendedoraTelefone(e.target.value)}
+                    placeholder="(11) 99999-9999"
+                    className="w-full px-3 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1.5">
-                  WhatsApp da Revendedora
-                </label>
-                <input
-                  type="tel"
-                  value={revendedoraTelefone}
-                  onChange={(e) => setRevendedoraTelefone(e.target.value)}
-                  placeholder="(11) 99999-9999"
-                  className="w-full px-3 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
-                />
-              </div>
-            </div>
+            )}
 
             <button
               onClick={calcularAcerto}

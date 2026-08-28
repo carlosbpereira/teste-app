@@ -1,9 +1,11 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
 
 const ACCESS_TOKEN_COOKIE = "sb-access-token";
 const REFRESH_TOKEN_COOKIE = "sb-refresh-token";
 const USER_ROLE_COOKIE = "sb-user-role";
+const USER_ID_COOKIE = "sb-user-id";
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export type UserRole = "administrador" | "revendedor";
@@ -11,34 +13,24 @@ export type UserRole = "administrador" | "revendedor";
 export async function createSession(
   accessToken: string,
   refreshToken: string,
-  role: UserRole = "revendedor"
+  role: UserRole = "revendedor",
+  userId: string = ""
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
   const cookieStore = await cookies();
 
-  cookieStore.set(ACCESS_TOKEN_COOKIE, accessToken, {
+  const cookieOpts = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     expires: expiresAt,
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
-  });
+  };
 
-  cookieStore.set(REFRESH_TOKEN_COOKIE, refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    expires: expiresAt,
-    sameSite: "lax",
-    path: "/",
-  });
-
-  cookieStore.set(USER_ROLE_COOKIE, role, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    expires: expiresAt,
-    sameSite: "lax",
-    path: "/",
-  });
+  cookieStore.set(ACCESS_TOKEN_COOKIE, accessToken, cookieOpts);
+  cookieStore.set(REFRESH_TOKEN_COOKIE, refreshToken, cookieOpts);
+  cookieStore.set(USER_ROLE_COOKIE, role, cookieOpts);
+  cookieStore.set(USER_ID_COOKIE, userId, cookieOpts);
 }
 
 export async function deleteSession(): Promise<void> {
@@ -46,6 +38,7 @@ export async function deleteSession(): Promise<void> {
   cookieStore.delete(ACCESS_TOKEN_COOKIE);
   cookieStore.delete(REFRESH_TOKEN_COOKIE);
   cookieStore.delete(USER_ROLE_COOKIE);
+  cookieStore.delete(USER_ID_COOKIE);
 }
 
 export async function getSession(): Promise<{
@@ -62,14 +55,36 @@ export async function getSession(): Promise<{
 export async function getSessionUser(): Promise<{
   accessToken: string | undefined;
   role: UserRole | undefined;
+  userId: string | undefined;
 }> {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
   const rawRole = cookieStore.get(USER_ROLE_COOKIE)?.value;
+  const userId = cookieStore.get(USER_ID_COOKIE)?.value;
   const role =
     rawRole === "administrador" || rawRole === "revendedor"
       ? rawRole
       : undefined;
 
-  return { accessToken, role };
+  return { accessToken, role, userId };
+}
+
+/**
+ * Obtém o userId via Supabase getUser() para validação server-side confiável.
+ * Usa o access token do cookie para verificar autenticidade no Supabase.
+ */
+export async function getVerifiedUserId(): Promise<string | null> {
+  const { accessToken } = await getSession();
+  if (!accessToken) return null;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+
+  const client = createClient(url, key, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+  });
+
+  const { data } = await client.auth.getUser();
+  return data.user?.id ?? null;
 }

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, isGuardError } from "@/lib/auth-guard";
 
 export async function GET(req: NextRequest) {
+  // ── Guard ──────────────────────────────────────────────
+  const auth = await requireAuth();
+  if (isGuardError(auth)) return auth;
+  const { role, userId } = auth;
+  // ──────────────────────────────────────────────────────
+
   try {
     const { searchParams } = new URL(req.url);
     const categoria = searchParams.get("categoria");
@@ -10,9 +17,20 @@ export async function GET(req: NextRequest) {
     const q = searchParams.get("q");
 
     const where: Record<string, unknown> = {};
+
+    // ── RBAC Scoping ──────────────────────────────────────
+    if (role === "revendedor") {
+      // Revendedora só vê peças alocadas para ela
+      where.revendedoraId = userId;
+      where.localizacao = "REVENDEDORA";
+    } else {
+      // Admin pode filtrar por qualquer localização
+      if (localizacao) where.localizacao = localizacao;
+    }
+    // ─────────────────────────────────────────────────────
+
     if (categoria) where.categoria = categoria;
     if (status) where.status = status;
-    if (localizacao) where.localizacao = localizacao;
     if (q) {
       where.OR = [
         { nome: { contains: q, mode: "insensitive" } },
@@ -34,6 +52,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // ── Guard: apenas admin pode cadastrar produtos ─────────
+  const auth = await requireAuth();
+  if (isGuardError(auth)) return auth;
+  if (auth.role !== "administrador") {
+    return NextResponse.json(
+      { error: "Apenas administradores podem cadastrar produtos." },
+      { status: 403 }
+    );
+  }
+  // ────────────────────────────────────────────────────────
+
   try {
     const body = await req.json();
     const {
@@ -46,6 +75,7 @@ export async function POST(req: NextRequest) {
       fotoUrl,
       status,
       localizacao,
+      revendedoraId,
     } = body;
 
     if (!nome || !categoria || !precoCusto || !precoVenda) {
@@ -66,6 +96,7 @@ export async function POST(req: NextRequest) {
         fotoUrl,
         status: status || "DISPONIVEL",
         localizacao: localizacao || "DONA",
+        revendedoraId: revendedoraId || null,
       },
     });
 
