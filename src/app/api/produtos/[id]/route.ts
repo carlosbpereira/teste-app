@@ -107,7 +107,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       if (!produto) {
         return NextResponse.json({ error: "Produto não encontrado" }, { status: 404 });
       }
-      const novaLocalizacao = produto.localizacao === "DONA" ? "REVENDEDORA" : "DONA";
+      const novaLocalizacao = body.localizacao || (produto.localizacao === "DONA" ? "REVENDEDORA" : "DONA");
       const updated = await prisma.produto.update({
         where: { id },
         data: {

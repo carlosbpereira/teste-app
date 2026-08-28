@@ -71,10 +71,16 @@ export default function ConsignacaoPage() {
 
   useEffect(() => {
     fetchMaleta();
-    // Buscar role
+    // Buscar role e dados da sessão
     fetch("/api/me")
       .then((r) => r.json())
-      .then((d) => setIsAdmin(d.role === "administrador"))
+      .then((d) => {
+        setIsAdmin(d.role === "administrador");
+        if (d.role === "revendedor") {
+          if (d.name) setRevendedoraNome(d.name);
+          if (d.phone) setRevendedoraTelefone(d.phone);
+        }
+      })
       .catch(() => setIsAdmin(false));
   }, [fetchMaleta]);
 
@@ -316,8 +322,8 @@ export default function ConsignacaoPage() {
               </div>
             </div>
 
-            {/* Campos de nome/telefone apenas para admin (para gerar resumo por revendedora) */}
-            {isAdmin && (
+            {/* Campos de nome/telefone */}
+            {isAdmin ? (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">
@@ -344,6 +350,21 @@ export default function ConsignacaoPage() {
                   />
                 </div>
               </div>
+            ) : (
+              !revendedoraTelefone && (
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">
+                    Seu WhatsApp (para envio do resumo)
+                  </label>
+                  <input
+                    type="tel"
+                    value={revendedoraTelefone}
+                    onChange={(e) => setRevendedoraTelefone(e.target.value)}
+                    placeholder="(11) 99999-9999"
+                    className="w-full px-3 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
+                  />
+                </div>
+              )
             )}
 
             <button

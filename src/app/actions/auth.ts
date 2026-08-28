@@ -70,11 +70,16 @@ export async function login(
   const role: UserRole =
     rawRole === "administrador" ? "administrador" : "revendedor";
 
+  const name = (data.user?.user_metadata?.full_name as string) ?? "";
+  const phone = (data.user?.user_metadata?.phone as string) ?? "";
+
   await createSession(
     data.session.access_token,
     data.session.refresh_token,
     role,
-    data.user.id   // ← userId do Supabase Auth
+    data.user.id,
+    name,
+    phone
   );
   redirect("/");
 }
@@ -115,6 +120,7 @@ export async function createUser(
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const role = formData.get("role") as string;
+  const phone = (formData.get("phone") as string | null) ?? "";
 
   if (!name || !email || !password || !role) {
     return { error: "Preencha todos os campos." };
@@ -133,10 +139,11 @@ export async function createUser(
   const { error } = await adminSupabase.auth.admin.createUser({
     email: email.trim().toLowerCase(),
     password,
-    email_confirm: true, // sem necessidade de confirmação por e-mail
+    email_confirm: true,
     user_metadata: {
       full_name: name.trim(),
       role,
+      phone: phone.trim(),
     },
   });
 

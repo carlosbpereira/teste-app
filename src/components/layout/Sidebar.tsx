@@ -14,6 +14,7 @@ import {
   Crown,
   LogOut,
   Users,
+  UserCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { logout } from "@/app/actions/auth";
@@ -54,6 +55,13 @@ const navItems = [
     icon: CreditCard,
     description: "Promissórias",
     adminOnly: false,
+  },
+  {
+    href: "/admin/revendedoras",
+    label: "Revendedoras",
+    icon: UserCheck,
+    description: "Equipe e maletas",
+    adminOnly: true,
   },
   {
     href: "/admin/usuarios",

@@ -13,6 +13,7 @@ import {
   MessageCircle,
   ChevronRight,
   ArrowUpRight,
+  Users,
 } from "lucide-react";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -278,7 +279,7 @@ export default function DashboardPage() {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-400 mb-3">
           Ações Rápidas
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className={`grid grid-cols-1 ${isAdmin ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"} gap-3`}>
           <Link
             href="/pdv"
             id="quick-action-nova-venda"
@@ -312,6 +313,23 @@ export default function DashboardPage() {
             </div>
             <ArrowUpRight className="w-4 h-4 text-stone-300 group-hover:text-gold-500 transition-colors" />
           </Link>
+
+          {isAdmin && (
+            <Link
+              href="/admin/revendedoras"
+              id="quick-action-revendedoras"
+              className="flex items-center gap-3 p-4 bg-white border border-stone-100 rounded-2xl hover:border-purple-200 hover:shadow-sm transition-all group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-sm text-stone-800">Revendedoras</p>
+                <p className="text-xs text-stone-400">Equipe & maletas</p>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-stone-300 group-hover:text-purple-500 transition-colors" />
+            </Link>
+          )}
 
           <Link
             href="/cobrancas"

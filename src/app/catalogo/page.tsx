@@ -75,6 +75,14 @@ export default function CatalogoPage() {
 
   // Role do usuário logado
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [revendedoras, setRevendedoras] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
+
+  // Modal de transferência
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferProduto, setTransferProduto] = useState<Produto | null>(null);
+  const [targetLocalizacao, setTargetLocalizacao] = useState<Localizacao>("REVENDEDORA");
+  const [selectedRevendedoraId, setSelectedRevendedoraId] = useState<string>("");
+  const [transferring, setTransferring] = useState(false);
 
   // Filtros
   const [search, setSearch] = useState("");
@@ -102,11 +110,25 @@ export default function CatalogoPage() {
     }
   }, [search, filterCategoria, filterStatus, filterLocalizacao, isAdmin]);
 
-  // Buscar role do usuário
+  // Buscar role do usuário e revendedoras
   useEffect(() => {
     fetch("/api/me")
       .then((r) => r.json())
-      .then((d) => setIsAdmin(d.role === "administrador"))
+      .then((d) => {
+        const admin = d.role === "administrador";
+        setIsAdmin(admin);
+        if (admin) {
+          fetch("/api/admin/usuarios")
+            .then((res) => res.json())
+            .then((uData) => {
+              const revs = (uData.users ?? []).filter(
+                (u: { role: string }) => u.role === "revendedor"
+              );
+              setRevendedoras(revs);
+            })
+            .catch(console.error);
+        }
+      })
       .catch(() => setIsAdmin(false));
   }, []);
 
@@ -222,16 +244,41 @@ export default function CatalogoPage() {
     }
   };
 
-  const handleTransferirCustodia = async (produto: Produto) => {
+  const openTransferModal = (produto: Produto) => {
+    setTransferProduto(produto);
+    if (produto.localizacao === "DONA") {
+      setTargetLocalizacao("REVENDEDORA");
+      setSelectedRevendedoraId(revendedoras[0]?.id || "");
+    } else {
+      setTargetLocalizacao("DONA");
+      setSelectedRevendedoraId("");
+    }
+    setIsTransferModalOpen(true);
+  };
+
+  const handleConfirmTransfer = async () => {
+    if (!transferProduto) return;
+    if (targetLocalizacao === "REVENDEDORA" && !selectedRevendedoraId && revendedoras.length > 0) {
+      alert("Selecione a revendedora de destino.");
+      return;
+    }
+    setTransferring(true);
     try {
-      await fetch(`/api/produtos/${produto.id}`, {
+      await fetch(`/api/produtos/${transferProduto.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "transferir-custodia" }),
+        body: JSON.stringify({
+          action: "transferir-custodia",
+          localizacao: targetLocalizacao,
+          revendedoraId: targetLocalizacao === "REVENDEDORA" ? selectedRevendedoraId : null,
+        }),
       });
+      setIsTransferModalOpen(false);
       fetchProdutos();
     } catch (error) {
       console.error(error);
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -440,7 +487,7 @@ export default function CatalogoPage() {
                   {produto.status !== "VENDIDO" && (
                     isAdmin ? (
                       <button
-                        onClick={() => handleTransferirCustodia(produto)}
+                        onClick={() => openTransferModal(produto)}
                         className="flex items-center gap-1 px-2 py-1 rounded-lg border border-stone-200 text-stone-500 hover:border-gold-300 hover:text-gold-600 transition-all text-[10px] font-medium"
                         title="Transferir custódia"
                       >
@@ -477,35 +524,31 @@ export default function CatalogoPage() {
           <div>
             <label className="block text-sm font-medium text-stone-700 mb-2">Foto da Peça</label>
             <div
-              className="relative aspect-video rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 overflow-hidden cursor-pointer hover:border-gold-400 hover:bg-gold-50/30 transition-all"
               onClick={() => fileInputRef.current?.click()}
+              className="relative aspect-video max-h-48 rounded-2xl border-2 border-dashed border-stone-200 hover:border-gold-400 bg-stone-50 hover:bg-gold-50/30 transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden group"
             >
               {previewUrl ? (
                 <>
                   <Image src={previewUrl} alt="Preview" fill className="object-cover" />
-                  <div className="absolute inset-0 bg-stone-900/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="bg-white rounded-full p-3 shadow-lg">
-                      <Camera className="w-5 h-5 text-stone-700" />
-                    </div>
+                  <div className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Camera className="w-5 h-5 text-white" />
+                    <span className="text-white text-xs font-semibold">Trocar foto</span>
                   </div>
                 </>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-2 py-8">
+                <>
                   {uploadingImage ? (
-                    <LoadingSpinner size="md" label="Enviando foto..." />
+                    <LoadingSpinner label="Enviando imagem..." />
                   ) : (
                     <>
-                      <Upload className="w-8 h-8 text-stone-300" />
-                      <p className="text-sm text-stone-400">Clique para enviar uma foto</p>
-                      <p className="text-xs text-stone-300">JPG, PNG, WebP até 5MB</p>
+                      <Upload className="w-8 h-8 text-stone-300 group-hover:text-gold-500 transition-colors mb-2" />
+                      <p className="text-xs font-semibold text-stone-500 group-hover:text-gold-600">
+                        Clique para adicionar foto
+                      </p>
+                      <p className="text-[10px] text-stone-400 mt-0.5">PNG, JPG até 5MB</p>
                     </>
                   )}
-                </div>
-              )}
-              {uploadingImage && (
-                <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                  <LoadingSpinner size="md" label="Enviando..." />
-                </div>
+                </>
               )}
             </div>
             <input
@@ -521,40 +564,38 @@ export default function CatalogoPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                Nome da Peça <span className="text-red-400">*</span>
+                Nome da Peça *
               </label>
               <input
                 type="text"
                 value={form.nome}
                 onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                placeholder="Ex: Brinco Argola Dourado"
+                placeholder="Ex: Brinco Argola Cravejada Ouro 18k"
                 className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-100 transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1.5">SKU</label>
+              <label className="block text-sm font-medium text-stone-700 mb-1.5">SKU / Código</label>
               <input
                 type="text"
                 value={form.sku}
                 onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                placeholder="Ex: BRN-001"
-                className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-100 transition-all"
+                placeholder="Ex: BR-001"
+                className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                Categoria <span className="text-red-400">*</span>
-              </label>
+              <label className="block text-sm font-medium text-stone-700 mb-1.5">Categoria *</label>
               <select
                 value={form.categoria}
                 onChange={(e) => setForm({ ...form, categoria: e.target.value as Categoria })}
                 className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
               >
-                {CATEGORIAS.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {CATEGORIA_LABELS[cat]}
+                {CATEGORIAS.map((c) => (
+                  <option key={c} value={c}>
+                    {CATEGORIA_LABELS[c]}
                   </option>
                 ))}
               </select>
@@ -562,40 +603,34 @@ export default function CatalogoPage() {
 
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                Preço de Custo <span className="text-red-400">*</span>
+                Preço de Custo (R$) *
               </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">R$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.precoCusto}
-                  onChange={(e) => setForm({ ...form, precoCusto: e.target.value })}
-                  placeholder="0,00"
-                  className="w-full pl-9 pr-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-100 transition-all"
-                />
-              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.precoCusto}
+                onChange={(e) => setForm({ ...form, precoCusto: e.target.value })}
+                placeholder="0,00"
+                className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                Preço de Venda <span className="text-red-400">*</span>
+                Preço de Venda (R$) *
               </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">R$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.precoVenda}
-                  onChange={(e) => setForm({ ...form, precoVenda: e.target.value })}
-                  placeholder="0,00"
-                  className="w-full pl-9 pr-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-100 transition-all"
-                />
-              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.precoVenda}
+                onChange={(e) => setForm({ ...form, precoVenda: e.target.value })}
+                placeholder="0,00"
+                className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
+              />
               {form.precoCusto && form.precoVenda && (
-                <p className="text-xs text-emerald-600 mt-1">
+                <p className="text-[11px] text-emerald-600 font-medium mt-1">
                   Margem:{" "}
                   {(
                     ((parseFloat(form.precoVenda) - parseFloat(form.precoCusto)) /
@@ -659,6 +694,106 @@ export default function CatalogoPage() {
               className="flex-1 py-2.5 rounded-xl gold-gradient text-white font-semibold text-sm shadow-gold hover:shadow-gold-lg transition-all disabled:opacity-50"
             >
               {saving ? "Salvando..." : editingProduto ? "Salvar Alterações" : "Cadastrar Peça"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Transfer Modal */}
+      <Modal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        title="Transferir Custódia da Peça"
+        size="md"
+      >
+        <div className="p-5 space-y-4">
+          {transferProduto && (
+            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-stone-200 flex items-center justify-center flex-shrink-0">
+                <Package className="w-5 h-5 text-stone-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-stone-800 text-sm truncate">{transferProduto.nome}</p>
+                <p className="text-xs text-stone-400">
+                  Local atual: {transferProduto.localizacao === "DONA" ? "Com a Dona" : "Com Revendedora"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">
+              Destino da Peça
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setTargetLocalizacao("DONA")}
+                className={`py-2.5 px-3 rounded-xl border-2 text-xs font-bold transition-all ${
+                  targetLocalizacao === "DONA"
+                    ? "border-gold-500 bg-gold-50 text-gold-700"
+                    : "border-stone-200 text-stone-600 hover:border-stone-300"
+                }`}
+              >
+                👑 Estoque da Dona
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetLocalizacao("REVENDEDORA");
+                  if (!selectedRevendedoraId && revendedoras.length > 0) {
+                    setSelectedRevendedoraId(revendedoras[0].id);
+                  }
+                }}
+                className={`py-2.5 px-3 rounded-xl border-2 text-xs font-bold transition-all ${
+                  targetLocalizacao === "REVENDEDORA"
+                    ? "border-purple-500 bg-purple-50 text-purple-700"
+                    : "border-stone-200 text-stone-600 hover:border-stone-300"
+                }`}
+              >
+                💼 Revendedora
+              </button>
+            </div>
+          </div>
+
+          {targetLocalizacao === "REVENDEDORA" && (
+            <div className="space-y-1.5 animate-slide-up">
+              <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                Selecione a Revendedora
+              </label>
+              {revendedoras.length === 0 ? (
+                <p className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                  Nenhuma revendedora cadastrada. Cadastre uma em Gestão de Usuários.
+                </p>
+              ) : (
+                <select
+                  value={selectedRevendedoraId}
+                  onChange={(e) => setSelectedRevendedoraId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all bg-white"
+                >
+                  {revendedoras.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.full_name || r.email} ({r.email})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => setIsTransferModalOpen(false)}
+              className="flex-1 py-2.5 rounded-xl border border-stone-200 text-stone-600 text-sm font-medium hover:bg-stone-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirmTransfer}
+              disabled={transferring || (targetLocalizacao === "REVENDEDORA" && revendedoras.length === 0)}
+              className="flex-1 py-2.5 rounded-xl gold-gradient text-white text-sm font-bold shadow-gold disabled:opacity-50"
+            >
+              {transferring ? "Transferindo..." : "Confirmar Transferência"}
             </button>
           </div>
         </div>

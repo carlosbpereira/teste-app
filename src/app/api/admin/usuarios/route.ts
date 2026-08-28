@@ -44,6 +44,7 @@ export async function GET() {
       email: u.email ?? "",
       full_name: u.user_metadata?.full_name ?? "",
       role: u.user_metadata?.role ?? "revendedor",
+      phone: u.user_metadata?.phone ?? "",
       created_at: u.created_at,
     }));
 

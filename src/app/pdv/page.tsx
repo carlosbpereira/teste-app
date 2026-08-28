@@ -84,6 +84,8 @@ export default function PDVPage() {
   const [searchingProdutos, setSearchingProdutos] = useState(false);
 
   // Step 3: Pagamento
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [userName, setUserName] = useState("");
   const [vendedoraTipo, setVendedoraTipo] = useState<VendedoraTipo>("DONA");
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>("PIX");
   const [desconto, setDesconto] = useState("");
@@ -91,6 +93,21 @@ export default function PDVPage() {
   const [primeiroVencimento, setPrimeiroVencimento] = useState(
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   );
+
+  // Buscar dados da sessão
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => {
+        const admin = d.role === "administrador";
+        setIsAdmin(admin);
+        if (!admin) {
+          setVendedoraTipo("REVENDEDORA");
+        }
+        if (d.name) setUserName(d.name);
+      })
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   // Step 4 / resultado
   const [submitting, setSubmitting] = useState(false);
@@ -251,7 +268,7 @@ export default function PDVPage() {
     setProdutoSearch("");
     setDesconto("");
     setFormaPagamento("PIX");
-    setVendedoraTipo("DONA");
+    setVendedoraTipo(isAdmin ? "DONA" : "REVENDEDORA");
     setNumParcelas(2);
     setVendaRealizada(null);
     setIsSuccessModalOpen(false);
@@ -274,7 +291,10 @@ export default function PDVPage() {
           valor: p.valorParcela,
           vencimento: p.dataVencimento,
         })),
-        vendedora: vendedoraTipo === "DONA" ? "Labela Semijoias" : "Revendedora",
+        vendedora:
+          vendedoraTipo === "DONA"
+            ? "Labela Semijoias"
+            : (userName ? `${userName} (Revendedora)` : "Revendedora"),
       })
     : "#";
 
@@ -590,27 +610,29 @@ export default function PDVPage() {
               <h2 className="text-xl font-bold text-stone-800">Pagamento</h2>
             </div>
 
-            {/* Vendedora */}
-            <div>
-              <label className="block text-sm font-semibold text-stone-700 mb-2">
-                Vendedora Responsável
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["DONA", "REVENDEDORA"] as VendedoraTipo[]).map((tipo) => (
-                  <button
-                    key={tipo}
-                    onClick={() => setVendedoraTipo(tipo)}
-                    className={`py-3 rounded-2xl border-2 font-semibold text-sm transition-all ${
-                      vendedoraTipo === tipo
-                        ? "border-stone-900 bg-stone-900 text-white"
-                        : "border-stone-200 text-stone-600 hover:border-stone-300"
-                    }`}
-                  >
-                    {tipo === "DONA" ? "👑 Dona" : "💼 Revendedora"}
-                  </button>
-                ))}
+            {/* Vendedora — apenas exibido para administrador */}
+            {isAdmin && (
+              <div>
+                <label className="block text-sm font-semibold text-stone-700 mb-2">
+                  Vendedora Responsável
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["DONA", "REVENDEDORA"] as VendedoraTipo[]).map((tipo) => (
+                    <button
+                      key={tipo}
+                      onClick={() => setVendedoraTipo(tipo)}
+                      className={`py-3 rounded-2xl border-2 font-semibold text-sm transition-all ${
+                        vendedoraTipo === tipo
+                          ? "border-stone-900 bg-stone-900 text-white"
+                          : "border-stone-200 text-stone-600 hover:border-stone-300"
+                      }`}
+                    >
+                      {tipo === "DONA" ? "👑 Dona" : "💼 Revendedora"}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Forma de Pagamento */}
             <div>

@@ -8,6 +8,7 @@ import {
   Mail,
   Lock,
   User,
+  Phone,
   Eye,
   EyeOff,
   Shield,
@@ -23,6 +24,7 @@ interface SupabaseUser {
   email: string;
   full_name: string;
   role: string;
+  phone?: string;
   created_at: string;
 }
 
@@ -144,6 +146,29 @@ export default function GestaoUsuariosPage() {
                   type="email"
                   required
                   placeholder="usuario@email.com"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-stone-800 placeholder-stone-400
+                    bg-stone-50 border border-stone-200
+                    focus:outline-none focus:border-gold-400 focus:bg-white
+                    transition-all duration-200"
+                />
+              </div>
+            </div>
+
+            {/* Telefone / WhatsApp */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="phone"
+                className="text-xs font-semibold text-stone-500 uppercase tracking-wider"
+              >
+                WhatsApp / Telefone (opcional)
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="(11) 99999-9999"
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-stone-800 placeholder-stone-400
                     bg-stone-50 border border-stone-200
                     focus:outline-none focus:border-gold-400 focus:bg-white
@@ -281,7 +306,9 @@ export default function GestaoUsuariosPage() {
                     <p className="text-sm font-semibold text-stone-800 truncate">
                       {user.full_name || "—"}
                     </p>
-                    <p className="text-xs text-stone-400 truncate">{user.email}</p>
+                    <p className="text-xs text-stone-400 truncate">
+                      {user.email} {user.phone ? `· ${user.phone}` : ""}
+                    </p>
                   </div>
                   <span
                     className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${roleColors(user.role)}`}
