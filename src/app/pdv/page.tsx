@@ -25,6 +25,7 @@ import {
   Sparkles,
   ArrowRight,
   RefreshCw,
+  Lock,
 } from "lucide-react";
 import Image from "next/image";
 import { Modal } from "@/components/ui/Modal";
@@ -93,8 +94,8 @@ export default function PDVPage() {
   const [userName, setUserName] = useState("");
   const [vendedoraTipo, setVendedoraTipo] = useState<VendedoraTipo>("DONA");
 
-  // ── Scanner & Bipagem ──
-  const [isScannerActive, setIsScannerActive] = useState(true);
+  // ── Scanner & Bipagem (padrão desligada) ──
+  const [isScannerActive, setIsScannerActive] = useState(false);
   const [manualCodeInput, setManualCodeInput] = useState("");
   const [searchingCode, setSearchingCode] = useState(false);
 
@@ -166,6 +167,13 @@ export default function PDVPage() {
   // ── Lógica de Bipagem Contínua / Adicionar ao Carrinho ──
   const processarCodigoBipado = useCallback(
     async (codigo: string) => {
+      if (!clienteSelecionado) {
+        soundEffects.playErrorBeep();
+        showToast("Selecione o cliente primeiro para iniciar a bipagem!", "warning");
+        setIsClienteModalOpen(true);
+        return;
+      }
+
       const cleanCode = codigo.trim();
       if (!cleanCode) return;
 
@@ -226,7 +234,7 @@ export default function PDVPage() {
         setSearchingCode(false);
       }
     },
-    [showToast]
+    [clienteSelecionado, showToast]
   );
 
   // ── Controles Rápidos de Quantidade no Carrinho ──
@@ -333,7 +341,7 @@ export default function PDVPage() {
       setIsNovoCliente(false);
       setIsClienteModalOpen(false);
       setNovoClienteForm({ nome: "", telefone: "", cpf: "" });
-      showToast(`Cliente ${cliente.nome} selecionado`, "success");
+      showToast(`Cliente ${cliente.nome} selecionado! Venda liberada.`, "success");
     } catch (error) {
       console.error(error);
       alert("Erro ao cadastrar cliente");
@@ -362,16 +370,15 @@ export default function PDVPage() {
 
   // ── Finalizar Venda ──
   const handleFinalizarVenda = async () => {
-    if (carrinho.length === 0) {
-      alert("Adicione pelo menos uma peça ao carrinho");
-      return;
-    }
-
-    // Se não tiver cliente selecionado, abrir modal de cliente antes
     if (!clienteSelecionado) {
       setIsCheckoutModalOpen(false);
       setIsClienteModalOpen(true);
-      showToast("Por favor, selecione ou cadastre o cliente da venda", "warning");
+      showToast("Selecione o cliente primeiro para concluir a venda", "warning");
+      return;
+    }
+
+    if (carrinho.length === 0) {
+      alert("Adicione pelo menos uma peça ao carrinho");
       return;
     }
 
@@ -434,8 +441,8 @@ export default function PDVPage() {
     setNumParcelas(2);
     setVendaRealizada(null);
     setIsSuccessModalOpen(false);
-    setIsScannerActive(true);
-    showToast("Novo atendimento iniciado", "success");
+    setIsScannerActive(false);
+    showToast("Novo atendimento pronto para iniciar", "success");
   };
 
   const linkWhatsApp =
@@ -468,7 +475,7 @@ export default function PDVPage() {
       : "#";
 
   return (
-    <div className="min-h-[100dvh] bg-stone-100 flex flex-col pb-28">
+    <div className="min-h-[100dvh] bg-stone-100 flex flex-col pb-56 lg:pb-32">
       {/* ── Floating Animated Toasts ── */}
       <div className="fixed top-4 left-4 right-4 z-50 pointer-events-none flex flex-col items-center gap-2">
         {toasts.map((t) => (
@@ -508,21 +515,99 @@ export default function PDVPage() {
             onClick={() => setIsClienteModalOpen(true)}
             className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all ${
               clienteSelecionado
-                ? "bg-emerald-500/15 border-emerald-400 text-emerald-300 hover:bg-emerald-500/25"
-                : "bg-stone-800 border-stone-700 text-stone-300 hover:border-gold-400 hover:text-white"
+                ? "bg-emerald-500/20 border-emerald-400 text-emerald-300 hover:bg-emerald-500/30 font-semibold"
+                : "bg-gold-500/20 border-gold-400/50 text-gold-300 hover:bg-gold-500/30 animate-pulse"
             }`}
           >
             <User className="w-3.5 h-3.5" />
             <span className="max-w-[110px] truncate">
-              {clienteSelecionado ? clienteSelecionado.nome : "Cliente"}
+              {clienteSelecionado ? clienteSelecionado.nome : "1. Selecionar Cliente"}
             </span>
           </button>
         </div>
       </header>
 
       <main className="flex-1 max-w-xl w-full mx-auto p-4 space-y-4">
+        {/* ── ETAPA 1: Bloco de Seleção de Cliente ── */}
+        {!clienteSelecionado ? (
+          <section className="bg-gradient-to-br from-amber-500/10 via-gold-500/5 to-white rounded-3xl p-4.5 border-2 border-gold-400/50 shadow-sm space-y-3 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl gold-gradient flex items-center justify-center text-stone-950 font-bold shadow-gold flex-shrink-0">
+                <User className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-bold text-stone-900 flex items-center gap-1.5">
+                  <span>Passo 1: Selecionar Cliente</span>
+                  <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded">
+                    Obrigatório
+                  </span>
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Para liberar a leitura de peças e o registro da venda, selecione o cliente abaixo.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNovoCliente(false);
+                  setIsClienteModalOpen(true);
+                }}
+                className="w-full py-3 px-4 gold-gradient text-stone-950 font-bold rounded-2xl shadow-gold hover:shadow-gold-lg transition-all text-xs flex items-center justify-center gap-2"
+              >
+                <Search className="w-4 h-4" />
+                Buscar Cliente Cadastrado
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNovoCliente(true);
+                  setIsClienteModalOpen(true);
+                }}
+                className="w-full py-3 px-4 bg-white border border-stone-200 hover:border-gold-400 text-stone-700 font-bold rounded-2xl transition-all text-xs flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4 text-gold-600" />
+                Novo Cliente Rápido
+              </button>
+            </div>
+          </section>
+        ) : (
+          /* Card do Cliente Selecionado Ativo */
+          <section className="bg-emerald-50 border border-emerald-200 rounded-3xl p-3.5 flex items-center justify-between gap-3 shadow-sm animate-fade-in">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+                <User className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] uppercase font-extrabold text-emerald-800 bg-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Check className="w-2.5 h-2.5" /> Cliente Selecionado
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm font-bold text-stone-800 truncate mt-0.5">
+                  {clienteSelecionado.nome}
+                </p>
+                <p className="text-[11px] text-stone-500">{clienteSelecionado.telefone}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsClienteModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors flex-shrink-0"
+            >
+              Trocar
+            </button>
+          </section>
+        )}
+
         {/* ── ÁREA SUPERIOR: Módulo de Leitor de Câmera ── */}
-        <section className="bg-white rounded-3xl p-4 border border-stone-200/80 shadow-sm space-y-3">
+        <section
+          className={`bg-white rounded-3xl p-4 border shadow-sm space-y-3 transition-all relative ${
+            !clienteSelecionado ? "border-stone-200/60 opacity-80" : "border-stone-200/80"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Barcode className="w-4 h-4 text-gold-600" />
@@ -533,7 +618,14 @@ export default function PDVPage() {
 
             {/* Toggle Camera Switch */}
             <button
-              onClick={() => setIsScannerActive(!isScannerActive)}
+              onClick={() => {
+                if (!clienteSelecionado) {
+                  showToast("Selecione o cliente antes de ligar o leitor!", "warning");
+                  setIsClienteModalOpen(true);
+                  return;
+                }
+                setIsScannerActive(!isScannerActive);
+              }}
               className={`px-3 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
                 isScannerActive
                   ? "bg-stone-900 text-gold-300 hover:bg-stone-800"
@@ -558,7 +650,7 @@ export default function PDVPage() {
           {isScannerActive && (
             <div className="animate-fade-in">
               <CameraBarcodeScanner
-                isActive={isScannerActive}
+                isActive={isScannerActive && Boolean(clienteSelecionado)}
                 onScan={processarCodigoBipado}
                 onToggleActive={setIsScannerActive}
                 cooldownMs={1500}
@@ -569,10 +661,15 @@ export default function PDVPage() {
             </div>
           )}
 
-          {/* Manual Barcode / SKU Input Bar (Fallback) */}
+          {/* Manual Barcode / SKU Input Bar */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!clienteSelecionado) {
+                showToast("Selecione o cliente antes de bipar peças!", "warning");
+                setIsClienteModalOpen(true);
+                return;
+              }
               if (manualCodeInput.trim()) {
                 processarCodigoBipado(manualCodeInput);
                 setManualCodeInput("");
@@ -584,21 +681,47 @@ export default function PDVPage() {
               <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
               <input
                 type="text"
-                placeholder="Digitar código / SKU manualmente..."
+                placeholder={
+                  clienteSelecionado
+                    ? "Digitar código / SKU manualmente..."
+                    : "Selecione o cliente para liberar a bipagem..."
+                }
                 value={manualCodeInput}
                 onChange={(e) => setManualCodeInput(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-mono focus:outline-none focus:border-gold-400 focus:bg-white transition-all"
+                disabled={!clienteSelecionado}
+                className={`w-full pl-9 pr-3 py-2 border rounded-xl text-xs font-mono transition-all ${
+                  clienteSelecionado
+                    ? "bg-stone-50 border-stone-200 focus:outline-none focus:border-gold-400 focus:bg-white"
+                    : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed"
+                }`}
               />
             </div>
             <button
               type="submit"
-              disabled={searchingCode || !manualCodeInput.trim()}
+              disabled={searchingCode || !manualCodeInput.trim() || !clienteSelecionado}
               className="px-3.5 py-2 rounded-xl gold-gradient text-white text-xs font-bold shadow-gold disabled:opacity-40 transition-all flex items-center gap-1 hover:shadow-gold-lg"
             >
               {searchingCode ? <LoadingSpinner size="sm" /> : <Plus className="w-4 h-4" />}
               Bipar
             </button>
           </form>
+
+          {/* Bloqueio Visual caso cliente não esteja selecionado */}
+          {!clienteSelecionado && (
+            <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-center gap-2.5 text-xs text-amber-800">
+              <Lock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span className="flex-1">
+                Leitor aguardando seleção da cliente para início do atendimento.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsClienteModalOpen(true)}
+                className="font-bold underline text-amber-900 hover:text-black"
+              >
+                Selecionar
+              </button>
+            </div>
+          )}
         </section>
 
         {/* ── ÁREA CENTRAL: Carrinho de Compras ── */}
@@ -614,7 +737,14 @@ export default function PDVPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setIsCatalogModalOpen(true)}
+                onClick={() => {
+                  if (!clienteSelecionado) {
+                    showToast("Selecione o cliente primeiro!", "warning");
+                    setIsClienteModalOpen(true);
+                    return;
+                  }
+                  setIsCatalogModalOpen(true);
+                }}
                 className="text-[11px] font-semibold text-gold-700 hover:text-gold-800 bg-gold-50 hover:bg-gold-100 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
               >
                 <Search className="w-3 h-3" />
@@ -642,7 +772,9 @@ export default function PDVPage() {
               </div>
               <p className="text-sm font-bold text-stone-700">Carrinho Vazio</p>
               <p className="text-xs text-stone-400 max-w-xs mx-auto mt-1">
-                Aponte a câmera para as etiquetas das peças para adicioná-las automaticamente.
+                {clienteSelecionado
+                  ? "Ligue a câmera ou digite o código/SKU para adicionar peças à venda."
+                  : "Selecione a cliente acima para iniciar a bipagem das peças."}
               </p>
             </div>
           ) : (
@@ -724,24 +856,45 @@ export default function PDVPage() {
                   </div>
                 </div>
               ))}
+
+              {/* Botão de Checkout Inline (Direto no Carrinho) */}
+              <div className="pt-4 mt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-stone-100">
+                <div className="w-full sm:w-auto flex justify-between sm:block">
+                  <span className="text-xs text-stone-500 font-medium">Subtotal ({quantidadeTotal} itens):</span>
+                  <p className="text-base font-black text-gold-600 leading-tight">
+                    {formatCurrency(valorTotal)}
+                  </p>
+                </div>
+
+                <button
+                  id="btn-finalizar-venda-inline"
+                  type="button"
+                  onClick={() => setIsCheckoutModalOpen(true)}
+                  className="w-full sm:w-auto py-3 px-5 gold-gradient text-stone-950 font-bold rounded-2xl shadow-gold hover:shadow-gold-lg transition-all text-xs flex items-center justify-center gap-2"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Finalizar Venda</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
         </section>
       </main>
 
-      {/* ── RODAPÉ FIXO: Checkout Bar ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-stone-900 border-t border-stone-800 p-3 shadow-2xl safe-area-bottom">
+      {/* ── RODAPÉ FIXO: Checkout Bar Elevado Acima do Menu Mobile ── */}
+      <div className="fixed bottom-[58px] lg:bottom-0 left-0 right-0 z-45 bg-stone-900/95 backdrop-blur-md border-t border-stone-800 p-3 shadow-2xl safe-area-bottom">
         <div className="max-w-xl mx-auto flex items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-400 uppercase font-semibold tracking-wider">
+              <span className="text-[11px] text-stone-400 uppercase font-semibold tracking-wider">
                 Total da Venda
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold-400/20 text-gold-300">
                 {quantidadeTotal} {quantidadeTotal === 1 ? "item" : "itens"}
               </span>
             </div>
-            <p className="text-2xl font-black text-gold-400 leading-tight">
+            <p className="text-xl sm:text-2xl font-black text-gold-400 leading-tight">
               {formatCurrency(valorTotal)}
             </p>
           </div>
@@ -749,6 +902,11 @@ export default function PDVPage() {
           <button
             id="btn-abrir-checkout"
             onClick={() => {
+              if (!clienteSelecionado) {
+                showToast("Selecione o cliente primeiro!", "warning");
+                setIsClienteModalOpen(true);
+                return;
+              }
               if (carrinho.length === 0) {
                 showToast("Adicione peças ao carrinho para prosseguir", "warning");
                 return;
@@ -756,7 +914,7 @@ export default function PDVPage() {
               setIsCheckoutModalOpen(true);
             }}
             disabled={carrinho.length === 0}
-            className="flex-1 max-w-[200px] py-3.5 px-4 gold-gradient text-stone-950 font-bold rounded-2xl shadow-gold flex items-center justify-center gap-2 transition-all hover:shadow-gold-lg disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+            className="flex-1 max-w-[200px] py-3 px-4 gold-gradient text-stone-950 font-bold rounded-2xl shadow-gold flex items-center justify-center gap-2 transition-all hover:shadow-gold-lg disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
           >
             <span>Finalizar Venda</span>
             <ArrowRight className="w-4 h-4" />
@@ -818,7 +976,7 @@ export default function PDVPage() {
                       onClick={() => {
                         setClienteSelecionado(c);
                         setIsClienteModalOpen(false);
-                        showToast(`Cliente ${c.nome} selecionado`, "success");
+                        showToast(`Cliente ${c.nome} selecionado! Venda liberada.`, "success");
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gold-50 transition-colors border-b border-stone-50 last:border-0 text-left"
                     >
