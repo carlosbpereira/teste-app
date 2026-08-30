@@ -125,3 +125,18 @@
   0%, 100% { box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.4); }
   50% { box-shadow: 0 0 0 8px rgba(201, 168, 76, 0); }
 }
+
+@keyframes scanLaser {
+  0% {
+    top: 5%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 92%;
+    opacity: 1;
+  }
+  100% {
+    top: 5%;
+    opacity: 0.8;
+  }
+}

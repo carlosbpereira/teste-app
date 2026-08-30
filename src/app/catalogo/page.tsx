@@ -15,11 +15,16 @@ import {
   Trash2,
   Camera,
   Package,
+  ScanLine,
+  Barcode,
+  Check,
+  AlertTriangle,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Badge, StatusBadge, LocalizacaoBadge } from "@/components/ui/Badge";
 import { LoadingSpinner, SkeletonCard } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { CameraBarcodeScanner } from "@/components/ui/CameraBarcodeScanner";
 import { formatCurrency } from "@/lib/utils";
 import { uploadProductImage } from "@/lib/supabase";
 
@@ -72,6 +77,12 @@ export default function CatalogoPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nomeInputRef = useRef<HTMLInputElement>(null);
+
+  // Scanner de código de barras no cadastro
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [skuStatus, setSkuStatus] = useState<"idle" | "checking" | "valid" | "duplicate">("idle");
+  const [duplicateProduto, setDuplicateProduto] = useState<Produto | null>(null);
 
   // Role do usuário logado
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -138,10 +149,46 @@ export default function CatalogoPage() {
     return () => clearTimeout(timer);
   }, [fetchProdutos, isAdmin]);
 
+  const checkSkuDuplicity = useCallback(async (skuValue: string, currentId?: string) => {
+    const trimmed = skuValue.trim();
+    if (!trimmed) {
+      setSkuStatus("idle");
+      setDuplicateProduto(null);
+      return;
+    }
+    setSkuStatus("checking");
+    try {
+      const params = new URLSearchParams({ sku: trimmed });
+      if (currentId) params.set("excludeId", currentId);
+      const res = await fetch(`/api/produtos/verificar-sku?${params}`);
+      const data = await res.json();
+      if (data.exists && data.produto) {
+        setSkuStatus("duplicate");
+        setDuplicateProduto(data.produto);
+      } else {
+        setSkuStatus("valid");
+        setDuplicateProduto(null);
+      }
+    } catch {
+      setSkuStatus("idle");
+    }
+  }, []);
+
+  const handleScanSku = async (decodedSku: string) => {
+    setIsScannerModalOpen(false);
+    setForm((prev) => ({ ...prev, sku: decodedSku }));
+    await checkSkuDuplicity(decodedSku, editingProduto?.id);
+    setTimeout(() => {
+      nomeInputRef.current?.focus();
+    }, 150);
+  };
+
   const openCreate = () => {
     setEditingProduto(null);
     setForm(emptyForm);
     setPreviewUrl("");
+    setSkuStatus("idle");
+    setDuplicateProduto(null);
     setIsModalOpen(true);
   };
 
@@ -159,6 +206,8 @@ export default function CatalogoPage() {
       localizacao: produto.localizacao,
     });
     setPreviewUrl(produto.fotoUrl || "");
+    setSkuStatus("idle");
+    setDuplicateProduto(null);
     setIsModalOpen(true);
   };
 
@@ -190,6 +239,13 @@ export default function CatalogoPage() {
   const handleSave = async () => {
     if (!form.nome || !form.categoria || !form.precoCusto || !form.precoVenda) {
       alert("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    if (skuStatus === "duplicate") {
+      alert(
+        `O código ${form.sku} já está cadastrado para o produto "${duplicateProduto?.nome}". Utilize um código exclusivo.`
+      );
       return;
     }
 
@@ -567,6 +623,7 @@ export default function CatalogoPage() {
                 Nome da Peça *
               </label>
               <input
+                ref={nomeInputRef}
                 type="text"
                 value={form.nome}
                 onChange={(e) => setForm({ ...form, nome: e.target.value })}
@@ -575,15 +632,73 @@ export default function CatalogoPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1.5">SKU / Código</label>
-              <input
-                type="text"
-                value={form.sku}
-                onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                placeholder="Ex: BR-001"
-                className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
-              />
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-stone-700">SKU / Código da Etiqueta</label>
+                <button
+                  type="button"
+                  onClick={() => setIsScannerModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-stone-900 hover:bg-stone-800 text-gold-300 text-xs font-semibold shadow-sm transition-all hover:shadow"
+                >
+                  <Barcode className="w-3.5 h-3.5 text-gold-400" />
+                  Escanear Etiqueta
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={form.sku}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm({ ...form, sku: val });
+                    checkSkuDuplicity(val, editingProduto?.id);
+                  }}
+                  placeholder="Ex: BRINCO-001 ou SUSP-042"
+                  className={`w-full pl-3.5 pr-10 py-2.5 border rounded-xl text-sm font-mono transition-all ${
+                    skuStatus === "valid"
+                      ? "border-emerald-400 bg-emerald-50/20 text-emerald-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                      : skuStatus === "duplicate"
+                      ? "border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+                      : "border-stone-200 focus:outline-none focus:border-gold-400"
+                  }`}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                  {skuStatus === "checking" && <LoadingSpinner size="sm" />}
+                  {skuStatus === "valid" && <Check className="w-4 h-4 text-emerald-600" />}
+                  {skuStatus === "duplicate" && <AlertTriangle className="w-4 h-4 text-rose-500" />}
+                </div>
+              </div>
+
+              {/* Duplicate Alert Box */}
+              {skuStatus === "duplicate" && duplicateProduto && (
+                <div className="mt-2.5 p-3.5 bg-rose-50/90 border border-rose-200 rounded-xl text-rose-900 text-xs flex items-start gap-2.5 animate-slide-up">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-bold text-rose-900">
+                      Código já cadastrado para o produto &quot;{duplicateProduto.nome}&quot;!
+                    </p>
+                    <p className="text-[11px] text-rose-700 mt-0.5">
+                      Deseja editar o item existente ou ajustar o estoque? O cadastro com código duplicado está bloqueado.
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(duplicateProduto)}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold text-[11px] transition-colors flex items-center gap-1"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        Editar {duplicateProduto.nome}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {skuStatus === "valid" && (
+                <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Código disponível para cadastro
+                </p>
+              )}
             </div>
 
             <div>
@@ -690,10 +805,40 @@ export default function CatalogoPage() {
             <button
               id="btn-salvar-produto"
               onClick={handleSave}
-              disabled={saving || uploadingImage}
+              disabled={saving || uploadingImage || skuStatus === "duplicate"}
               className="flex-1 py-2.5 rounded-xl gold-gradient text-white font-semibold text-sm shadow-gold hover:shadow-gold-lg transition-all disabled:opacity-50"
             >
               {saving ? "Salvando..." : editingProduto ? "Salvar Alterações" : "Cadastrar Peça"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Barcode Scanner Modal for Cadastro */}
+      <Modal
+        isOpen={isScannerModalOpen}
+        onClose={() => setIsScannerModalOpen(false)}
+        title="Escanear Etiqueta da Peça"
+        size="md"
+      >
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-stone-500">
+            Aponte a câmera do celular para o código de barras ou QR Code da etiqueta impressa.
+          </p>
+          <CameraBarcodeScanner
+            isActive={isScannerModalOpen}
+            onScan={handleScanSku}
+            singleScan={true}
+            containerId="scanner-modal-cadastro"
+            qrbox={{ width: 280, height: 140 }}
+          />
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => setIsScannerModalOpen(false)}
+              className="px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-100 rounded-xl transition-colors"
+            >
+              Fechar Câmera
             </button>
           </div>
         </div>
