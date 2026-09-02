@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
         nome: true,
         categoria: true,
         precoVenda: true,
+        quantidade: true,
         fotoUrl: true,
         status: true,
         localizacao: true,

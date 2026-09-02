@@ -70,6 +70,7 @@ model Produto {
   categoria      Categoria
   precoCusto     Decimal       @map("preco_custo") @db.Decimal(10, 2)
   precoVenda     Decimal       @map("preco_venda") @db.Decimal(10, 2)
+  quantidade     Int           @default(1)
   fotoUrl        String?       @map("foto_url")
   status         StatusProduto @default(DISPONIVEL)
   localizacao    Localizacao   @default(DONA)
@@ -105,6 +106,7 @@ model ItemVenda {
   id             String  @id @default(uuid())
   vendaId        String  @map("venda_id")
   produtoId      String  @map("produto_id")
+  quantidade     Int     @default(1)
   precoUnitario  Decimal @map("preco_unitario") @db.Decimal(10, 2)
 
   venda   Venda   @relation(fields: [vendaId], references: [id], onDelete: Cascade)

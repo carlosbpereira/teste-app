@@ -49,6 +49,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
         categoria: body.categoria,
         precoCusto: body.precoCusto ? parseFloat(body.precoCusto) : undefined,
         precoVenda: body.precoVenda ? parseFloat(body.precoVenda) : undefined,
+        quantidade:
+          body.quantidade !== undefined && !isNaN(parseInt(body.quantidade))
+            ? Math.max(0, parseInt(body.quantidade))
+            : undefined,
         fotoUrl: body.fotoUrl,
         status: body.status,
         localizacao: body.localizacao,

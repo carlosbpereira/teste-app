@@ -54,6 +54,7 @@ interface Produto {
   sku?: string;
   categoria: string;
   precoVenda: number;
+  quantidade?: number;
   fotoUrl?: string;
   localizacao: string;
   status: string;
@@ -189,11 +190,15 @@ export default function PDVPage() {
         }
 
         const produto: Produto = data.produto;
+        const estoqueDisponivel =
+          produto.quantidade !== undefined && produto.quantidade !== null
+            ? produto.quantidade
+            : 1;
 
         // Verificar disponibilidade da peça
-        if (!data.disponivel) {
+        if (!data.disponivel || estoqueDisponivel <= 0) {
           soundEffects.playErrorBeep();
-          showToast(`Peça indisponível: ${data.motivo || "não disponível para venda"}`, "error");
+          showToast(`Peça indisponível: ${data.motivo || "sem estoque disponível"}`, "error");
           return;
         }
 
@@ -203,7 +208,6 @@ export default function PDVPage() {
 
           if (index >= 0) {
             const itemAtual = prev[index];
-            // Trava de estoque: cada peça semijoia única tem estoque 1 no schema
             if (itemAtual.quantidade >= itemAtual.estoqueMaximo) {
               soundEffects.playErrorBeep();
               showToast(`Estoque máximo atingido para este item (${itemAtual.estoqueMaximo} disp.)`, "warning");
@@ -220,10 +224,10 @@ export default function PDVPage() {
             showToast(`+1 ${produto.nome} adicionado`, "success");
             return novo;
           } else {
-            // Insere nova linha com quantidade 1
+            // Insere nova linha com quantidade 1 e estoqueMaximo real
             soundEffects.playSuccessBeep();
-            showToast(`${produto.nome} adicionado ao carrinho!`, "success");
-            return [...prev, { produto, quantidade: 1, estoqueMaximo: 1 }];
+            showToast(`${produto.nome} adicionado ao carrinho! (${estoqueDisponivel} disp.)`, "success");
+            return [...prev, { produto, quantidade: 1, estoqueMaximo: estoqueDisponivel }];
           }
         });
       } catch (error) {
@@ -805,7 +809,7 @@ export default function PDVPage() {
                       <p className="text-xs font-bold text-stone-800 truncate">
                         {item.produto.nome}
                       </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {item.produto.sku && (
                           <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">
                             {item.produto.sku}
@@ -813,6 +817,9 @@ export default function PDVPage() {
                         )}
                         <span className="text-[10px] text-stone-400">
                           {formatCurrency(item.produto.precoVenda)} un.
+                        </span>
+                        <span className="text-[9px] font-semibold text-gold-700 bg-gold-50 border border-gold-200/60 px-1.5 py-0.5 rounded">
+                          Disp: {item.estoqueMaximo} un
                         </span>
                       </div>
                     </div>
@@ -833,8 +840,13 @@ export default function PDVPage() {
                       </span>
                       <button
                         onClick={() => incrementarQuantidade(item.produto.id)}
-                        className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-stone-200 active:bg-stone-300 transition-colors"
-                        title="Aumentar"
+                        disabled={item.quantidade >= item.estoqueMaximo}
+                        className={`w-7 h-7 flex items-center justify-center transition-colors ${
+                          item.quantidade >= item.estoqueMaximo
+                            ? "text-stone-300 cursor-not-allowed bg-stone-100"
+                            : "text-stone-600 hover:bg-stone-200 active:bg-stone-300"
+                        }`}
+                        title={item.quantidade >= item.estoqueMaximo ? "Estoque máximo atingido" : "Aumentar"}
                       >
                         <Plus className="w-3 h-3" />
                       </button>
@@ -1093,6 +1105,9 @@ export default function PDVPage() {
             ) : (
               catalogProdutos.map((p) => {
                 const inCart = carrinho.some((item) => item.produto.id === p.id);
+                const qtdDisp = p.quantidade !== undefined ? p.quantidade : 1;
+                const semEstoque = qtdDisp <= 0;
+
                 return (
                   <div
                     key={p.id}
@@ -1110,9 +1125,20 @@ export default function PDVPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-stone-800 truncate">{p.nome}</p>
-                        <p className="text-[10px] text-stone-400">
-                          {p.sku || p.categoria} · {formatCurrency(p.precoVenda)}
-                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-[10px] text-stone-400">
+                            {p.sku || p.categoria} · {formatCurrency(p.precoVenda)}
+                          </span>
+                          <span
+                            className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                              qtdDisp > 0
+                                ? "bg-stone-100 text-stone-600"
+                                : "bg-rose-50 text-rose-600 border border-rose-200"
+                            }`}
+                          >
+                            Disp: {qtdDisp} un
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -1120,14 +1146,18 @@ export default function PDVPage() {
                       onClick={() => {
                         processarCodigoBipado(p.sku || p.id);
                       }}
-                      disabled={inCart}
+                      disabled={inCart || semEstoque}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
-                        inCart
+                        semEstoque
+                          ? "bg-stone-100 text-stone-400 border border-stone-200 cursor-not-allowed"
+                          : inCart
                           ? "bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-not-allowed"
                           : "gold-gradient text-white shadow-gold hover:shadow-gold-lg"
                       }`}
                     >
-                      {inCart ? (
+                      {semEstoque ? (
+                        "Esgotado"
+                      ) : inCart ? (
                         <>
                           <Check className="w-3 h-3" /> No Carrinho
                         </>

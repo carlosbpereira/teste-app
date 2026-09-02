@@ -40,6 +40,7 @@ interface Produto {
   categoria: Categoria;
   precoCusto: number;
   precoVenda: number;
+  quantidade: number;
   fotoUrl?: string;
   status: Status;
   localizacao: Localizacao;
@@ -62,6 +63,7 @@ const emptyForm = {
   categoria: "BRINCO" as Categoria,
   precoCusto: "",
   precoVenda: "",
+  quantidade: "1",
   fotoUrl: "",
   status: "DISPONIVEL" as Status,
   localizacao: "DONA" as Localizacao,
@@ -201,6 +203,7 @@ export default function CatalogoPage() {
       categoria: produto.categoria,
       precoCusto: produto.precoCusto.toString(),
       precoVenda: produto.precoVenda.toString(),
+      quantidade: (produto.quantidade !== undefined ? produto.quantidade : 1).toString(),
       fotoUrl: produto.fotoUrl || "",
       status: produto.status,
       localizacao: produto.localizacao,
@@ -258,6 +261,7 @@ export default function CatalogoPage() {
         categoria: form.categoria,
         precoCusto: parseFloat(form.precoCusto),
         precoVenda: parseFloat(form.precoVenda),
+        quantidade: form.quantidade !== "" && !isNaN(parseInt(form.quantidade)) ? Math.max(0, parseInt(form.quantidade)) : 1,
         fotoUrl: form.fotoUrl || undefined,
         status: form.status,
         localizacao: form.localizacao,
@@ -356,6 +360,11 @@ export default function CatalogoPage() {
     {} as Record<Categoria, number>
   );
 
+  const totalEstoquePecas = produtos.reduce(
+    (acc, p) => acc + (p.status === "DISPONIVEL" ? (p.quantidade ?? 1) : 0),
+    0
+  );
+
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto animate-fade-in">
       {/* Page Header */}
@@ -365,8 +374,8 @@ export default function CatalogoPage() {
             {isAdmin ? "Catálogo & Estoque" : "Minha Maleta"}
           </h1>
           <p className="text-sm text-stone-400 mt-0.5">
-            {produtos.length} {produtos.length === 1 ? "peça" : "peças"}{" "}
-            {isAdmin ? "encontradas" : "alocadas para você"}
+            {produtos.length} {produtos.length === 1 ? "modelo cadastrado" : "modelos cadastrados"} ·{" "}
+            <span className="text-gold-600 font-semibold">{totalEstoquePecas} {totalEstoquePecas === 1 ? "peça disponível" : "peças disponíveis"}</span>
           </p>
         </div>
         {/* Botão Nova Peça apenas para admin */}
@@ -531,7 +540,19 @@ export default function CatalogoPage() {
                 {produto.sku && (
                   <p className="text-[10px] text-stone-400 mb-1">SKU: {produto.sku}</p>
                 )}
-                <LocalizacaoBadge localizacao={produto.localizacao} />
+                
+                <div className="flex items-center gap-1.5 flex-wrap my-1">
+                  <LocalizacaoBadge localizacao={produto.localizacao} />
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      (produto.quantidade ?? 1) > 0
+                        ? "bg-stone-100 text-stone-700"
+                        : "bg-rose-50 text-rose-600 border border-rose-200"
+                    }`}
+                  >
+                    Estoque: {produto.quantidade ?? 1} un
+                  </span>
+                </div>
 
                 <div className="flex items-center justify-between mt-2">
                   <div>
@@ -714,6 +735,21 @@ export default function CatalogoPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-1.5">
+                Quantidade em Estoque *
+              </label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                value={form.quantidade}
+                onChange={(e) => setForm({ ...form, quantidade: e.target.value })}
+                placeholder="1"
+                className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-gold-400 transition-all"
+              />
             </div>
 
             <div>

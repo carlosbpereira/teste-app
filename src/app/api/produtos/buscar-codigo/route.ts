@@ -49,17 +49,26 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Check status
-    const isDisponivel = produto.status === "DISPONIVEL";
+    // Check status e quantidade
+    const temEstoque = produto.quantidade > 0;
+    const isDisponivel = produto.status === "DISPONIVEL" && temEstoque;
+
+    let motivo: string | undefined;
+    if (produto.status !== "DISPONIVEL") {
+      motivo = `Peça com status ${produto.status}`;
+    } else if (!temEstoque) {
+      motivo = "Peça com estoque esgotado (0 unidades)";
+    }
 
     return NextResponse.json({
       found: true,
       disponivel: isDisponivel,
-      motivo: !isDisponivel ? `Peça com status ${produto.status}` : undefined,
+      motivo,
       produto: {
         ...produto,
         precoCusto: Number(produto.precoCusto),
         precoVenda: Number(produto.precoVenda),
+        quantidade: produto.quantidade,
       },
     });
   } catch (error) {

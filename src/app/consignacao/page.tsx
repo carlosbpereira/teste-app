@@ -25,6 +25,7 @@ interface Produto {
   categoria: string;
   precoVenda: number;
   precoCusto: number;
+  quantidade: number;
   fotoUrl?: string;
   status: string;
   localizacao: string;
@@ -119,8 +120,14 @@ export default function ConsignacaoPage() {
   const valorComissao = (faturamentoBruto * percentualComissao) / 100;
   const valorLiquido = faturamentoBruto - valorComissao;
 
-  const totalMaleta = maleta.reduce((acc, p) => acc + parseFloat(String(p.precoVenda)), 0);
-  const disponivel = maleta.filter((p) => p.status === "DISPONIVEL").length;
+  const totalPecasMaleta = maleta.reduce((acc, p) => acc + (p.quantidade ?? 1), 0);
+  const totalDisponiveis = maleta
+    .filter((p) => p.status === "DISPONIVEL")
+    .reduce((acc, p) => acc + (p.quantidade ?? 1), 0);
+  const totalMaleta = maleta.reduce(
+    (acc, p) => acc + parseFloat(String(p.precoVenda)) * (p.quantidade ?? 1),
+    0
+  );
 
   const linkAcerto =
     revendedoraTelefone && faturamentoBruto > 0
@@ -155,9 +162,9 @@ export default function ConsignacaoPage() {
         >
           <Package className="w-4 h-4" />
           Maleta Atual
-          {maleta.length > 0 && (
+          {totalPecasMaleta > 0 && (
             <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === "maleta" ? "bg-gold-100 text-gold-700" : "bg-stone-200 text-stone-500"}`}>
-              {maleta.length}
+              {totalPecasMaleta}
             </span>
           )}
         </button>
@@ -182,11 +189,11 @@ export default function ConsignacaoPage() {
           {maleta.length > 0 && (
             <div className="grid grid-cols-3 gap-3 mb-5">
               <div className="bg-white border border-stone-100 rounded-2xl p-4 text-center">
-                <p className="text-2xl font-bold text-stone-800">{maleta.length}</p>
-                <p className="text-xs text-stone-400 mt-0.5">Peças</p>
+                <p className="text-2xl font-bold text-stone-800">{totalPecasMaleta}</p>
+                <p className="text-xs text-stone-400 mt-0.5">Peças Totais</p>
               </div>
               <div className="bg-white border border-stone-100 rounded-2xl p-4 text-center">
-                <p className="text-2xl font-bold text-emerald-600">{disponivel}</p>
+                <p className="text-2xl font-bold text-emerald-600">{totalDisponiveis}</p>
                 <p className="text-xs text-stone-400 mt-0.5">Disponíveis</p>
               </div>
               <div className="bg-white border border-stone-100 rounded-2xl p-4 text-center">
@@ -236,6 +243,9 @@ export default function ConsignacaoPage() {
                     <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                       <span className="text-[10px] text-stone-400">{produto.categoria}</span>
                       <StatusBadge status={produto.status} />
+                      <span className="text-[10px] font-semibold bg-stone-100 text-stone-700 px-2 py-0.5 rounded-full">
+                        Qtd: {produto.quantidade ?? 1} un
+                      </span>
                     </div>
                     <p className="font-bold text-gold-600 text-sm mt-1">
                       {formatCurrency(produto.precoVenda)}

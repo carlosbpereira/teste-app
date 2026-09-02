@@ -35,23 +35,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const valorTotal = itens.reduce(
-      (acc: number, item: { precoUnitario: number }) => acc + item.precoUnitario,
+    // Calcular quantidade total demandada por produtoId
+    const qtdPorProduto: Record<string, number> = {};
+    for (const item of itens as Array<{ produtoId: string; precoUnitario: number; quantidade?: number }>) {
+      const q = item.quantidade && item.quantidade > 0 ? item.quantidade : 1;
+      qtdPorProduto[item.produtoId] = (qtdPorProduto[item.produtoId] || 0) + q;
+    }
+
+    const valorTotal = (itens as Array<{ precoUnitario: number; quantidade?: number }>).reduce(
+      (acc: number, item) => acc + item.precoUnitario * (item.quantidade && item.quantidade > 0 ? item.quantidade : 1),
       0
     );
     const valorFinal = valorTotal - desconto;
 
-    // Verificar se todos os produtos estão disponíveis
-    const produtosIds = itens.map((i: { produtoId: string }) => i.produtoId);
+    // Verificar se todos os produtos estão disponíveis e possuem estoque suficiente
+    const produtosIds = Object.keys(qtdPorProduto);
     const produtos = await prisma.produto.findMany({
       where: { id: { in: produtosIds } },
     });
 
-    const indisponiveis = produtos.filter((p) => p.status !== "DISPONIVEL");
-    if (indisponiveis.length > 0) {
+    const errosEstoque: string[] = [];
+    for (const p of produtos) {
+      const qtdDemandada = qtdPorProduto[p.id] || 0;
+      if (p.status !== "DISPONIVEL") {
+        errosEstoque.push(`"${p.nome}" (status ${p.status})`);
+      } else if (p.quantidade < qtdDemandada) {
+        errosEstoque.push(`"${p.nome}" (solicitado: ${qtdDemandada}, disponível: ${p.quantidade})`);
+      }
+    }
+
+    if (errosEstoque.length > 0) {
       return NextResponse.json(
         {
-          error: `Os seguintes produtos não estão disponíveis: ${indisponiveis.map((p) => p.nome).join(", ")}`,
+          error: `Problema de estoque nos seguintes produtos: ${errosEstoque.join("; ")}`,
         },
         { status: 409 }
       );
@@ -85,10 +101,11 @@ export async function POST(req: NextRequest) {
           valorFinal,
           formaPagamento,
           itens: {
-            create: itens.map(
-              (item: { produtoId: string; precoUnitario: number }) => ({
+            create: (itens as Array<{ produtoId: string; precoUnitario: number; quantidade?: number }>).map(
+              (item) => ({
                 produtoId: item.produtoId,
                 precoUnitario: item.precoUnitario,
+                quantidade: item.quantidade && item.quantidade > 0 ? item.quantidade : 1,
               })
             ),
           },
@@ -99,11 +116,18 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Atualizar status dos produtos para VENDIDO
-      await tx.produto.updateMany({
-        where: { id: { in: produtosIds } },
-        data: { status: "VENDIDO" },
-      });
+      // Baixa no estoque dos produtos
+      for (const p of produtos) {
+        const qtdVendida = qtdPorProduto[p.id] || 1;
+        const novaQtd = Math.max(0, p.quantidade - qtdVendida);
+        await tx.produto.update({
+          where: { id: p.id },
+          data: {
+            quantidade: novaQtd,
+            status: novaQtd <= 0 ? "VENDIDO" : "DISPONIVEL",
+          },
+        });
+      }
 
       // Criar parcelas se for promissória
       if (formaPagamento === "PROMISSORIA" && parcelas?.length > 0) {

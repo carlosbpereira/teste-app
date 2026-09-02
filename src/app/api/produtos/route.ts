@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       categoria,
       precoCusto,
       precoVenda,
+      quantidade,
       fotoUrl,
       status,
       localizacao,
@@ -93,6 +94,10 @@ export async function POST(req: NextRequest) {
         categoria,
         precoCusto: parseFloat(precoCusto),
         precoVenda: parseFloat(precoVenda),
+        quantidade:
+          quantidade !== undefined && !isNaN(parseInt(quantidade))
+            ? Math.max(0, parseInt(quantidade))
+            : 1,
         fotoUrl,
         status: status || "DISPONIVEL",
         localizacao: localizacao || "DONA",

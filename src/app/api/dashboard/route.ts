@@ -31,11 +31,15 @@ export async function GET() {
           include: { itens: true },
         }),
 
-        // Total de itens disponíveis (admin: geral; revendedora: só as dela)
+        // Total de itens em estoque (soma das quantidades de peças disponíveis)
         isAdmin
-          ? prisma.produto.count({ where: { status: "DISPONIVEL" } })
-          : prisma.produto.count({
+          ? prisma.produto.aggregate({
+              where: { status: "DISPONIVEL" },
+              _sum: { quantidade: true },
+            })
+          : prisma.produto.aggregate({
               where: { status: "DISPONIVEL", revendedoraId: userId },
+              _sum: { quantidade: true },
             }),
 
         // Total a receber em promissórias pendentes (com scoping)
@@ -67,14 +71,16 @@ export async function GET() {
       0
     );
     const pecasVendidasMes = vendasDoMes.reduce(
-      (acc, v) => acc + v.itens.length,
+      (acc, v) =>
+        acc +
+        v.itens.reduce((iAcc, item) => iAcc + (item.quantidade || 1), 0),
       0
     );
 
     const responseBase = {
       faturamentoMes,
       pecasVendidasMes,
-      totalEstoque,
+      totalEstoque: totalEstoque._sum.quantidade ?? 0,
       totalPromissorias: parseFloat(
         totalPromissorias._sum.valorParcela?.toString() ?? "0"
       ),

@@ -60,6 +60,7 @@ export async function GET() {
               id: true,
               nome: true,
               precoVenda: true,
+              quantidade: true,
             },
           }),
           prisma.venda.findMany({
@@ -70,20 +71,25 @@ export async function GET() {
             select: {
               id: true,
               valorFinal: true,
-              itens: { select: { id: true } },
+              itens: { select: { id: true, quantidade: true } },
             },
           }),
         ]);
 
-        const maletaQtd = maletaProdutos.length;
+        const maletaQtd = maletaProdutos.reduce(
+          (acc, p) => acc + (p.quantidade || 1),
+          0
+        );
         const maletaValorTotal = maletaProdutos.reduce(
-          (acc, p) => acc + parseFloat(p.precoVenda.toString()),
+          (acc, p) => acc + parseFloat(p.precoVenda.toString()) * (p.quantidade || 1),
           0
         );
 
         const vendasMesQtd = vendasDoMes.length;
         const pecasVendidasMes = vendasDoMes.reduce(
-          (acc, v) => acc + v.itens.length,
+          (acc, v) =>
+            acc +
+            v.itens.reduce((iAcc, item) => iAcc + (item.quantidade || 1), 0),
           0
         );
         const faturamentoMes = vendasDoMes.reduce(
