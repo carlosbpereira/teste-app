@@ -531,19 +531,45 @@ export default function CatalogoPage() {
                   <StatusBadge status={produto.status} />
                 </div>
 
-                {/* Quick actions — apenas para admin */}
+                {/* Quick actions para mobile (sempre visíveis no celular no topo direito da foto) */}
                 {isAdmin && (
-                  <div className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <div className="sm:hidden absolute top-2 right-2 flex items-center gap-1.5 z-10">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEdit(produto);
+                      }}
+                      className="w-8 h-8 rounded-full bg-white/95 backdrop-blur-sm shadow-md flex items-center justify-center text-stone-700 active:bg-gold-50 border border-stone-100 transition-all"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(produto);
+                      }}
+                      className="w-8 h-8 rounded-full bg-white/95 backdrop-blur-sm shadow-md flex items-center justify-center text-red-500 active:bg-red-50 border border-stone-100 transition-all"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Quick actions para desktop (hover sobre a foto) */}
+                {isAdmin && (
+                  <div className="hidden sm:flex absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-2">
                     <button
                       onClick={() => openEdit(produto)}
-                      className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-gold-50 transition-colors"
+                      className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-gold-50 transition-colors shadow-sm"
                       title="Editar"
                     >
                       <Edit2 className="w-4 h-4 text-stone-700" />
                     </button>
                     <button
                       onClick={() => handleDelete(produto)}
-                      className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-red-50 transition-colors"
+                      className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-red-50 transition-colors shadow-sm"
                       title="Excluir"
                     >
                       <Trash2 className="w-4 h-4 text-red-500" />
