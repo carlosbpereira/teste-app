@@ -39,3 +39,71 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# =========================================================
+# .gitignore - Next.js + Prisma + Supabase
+# Mescle com o que já existir no seu repositório (não sobrescreva
+# sem comparar, o Antigravity pode já ter gerado um .gitignore base).
+# =========================================================
+
+# ---------- Segredos / variáveis de ambiente ----------
+# NUNCA versionar isso. Se algum dia entrar por engano no histórico
+# do Git, trocar TODAS as senhas/keys envolvidas imediatamente.
+.env
+.env.local
+.env.production
+.env.production.local
+.env.development.local
+.env.test.local
+*.pem
+*.key
+
+# Exceção: o .env.example (só placeholders) PODE ser versionado
+# como referência para quem for configurar o projeto.
+!.env.example
+
+# ---------- Node / npm ----------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# ---------- Next.js ----------
+.next/
+out/
+next-env.d.ts
+
+# ---------- Build outputs ----------
+dist/
+build/
+
+# ---------- Prisma ----------
+# Nunca versionar dumps/backups de banco que passem pelo repo
+*.dump
+*.sql
+prisma/*.db
+
+# ---------- Backups locais (se algum dia rodar pg_dump na mesma pasta) ----------
+backups/
+*.dump.gz
+
+# ---------- Editor / SO ----------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---------- Antigravity (config local do agente, não é código do app) ----------
+.agent/
+.antigravity/
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ---------- Testes / coverage ----------
+coverage/
+.nyc_output/
+
+# ---------- TypeScript ----------
+*.tsbuildinfo
