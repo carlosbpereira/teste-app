@@ -26,7 +26,7 @@ export async function uploadProductImage(
   file: File,
   _fileName?: string
 ): Promise<string> {
-  // 1. Tenta upload via endpoint autenticado do servidor (ignora RLS com segurança via Service Role)
+  // 1. Tenta upload via endpoint autenticado do servidor
   try {
     const formData = new FormData();
     formData.append("file", file);
@@ -36,24 +36,21 @@ export async function uploadProductImage(
       body: formData,
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || `Erro ${res.status} no servidor`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) {
+        return data.url;
+      }
+    } else {
+      console.warn(`/api/upload retornou ${res.status}, tentando upload direto via Supabase Storage...`);
     }
-
-    if (data.url) {
-      return data.url;
-    }
-  } catch (apiErr: unknown) {
-    console.warn("Falha no /api/upload, tentando via cliente Supabase:", apiErr);
-    if (apiErr instanceof Error && !apiErr.message.includes("Failed to fetch")) {
-      throw apiErr;
-    }
+  } catch (apiErr) {
+    console.warn("Falha na chamada /api/upload, tentando upload direto:", apiErr);
   }
 
-  // 2. Fallback: upload direto pelo cliente Supabase
+  // 2. Fallback: upload direto pelo cliente Supabase (liberado via política RLS)
   const ext = file.name.split(".").pop() || "jpg";
-  const fileName = _fileName || `produto-${Date.now()}.${ext}`;
+  const fileName = _fileName || `produto-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
   const { data, error } = await supabase.storage
     .from("produtos")
     .upload(`${fileName}`, file, {
