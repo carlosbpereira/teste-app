@@ -218,28 +218,46 @@ export default function CatalogoPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Preview local
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A imagem selecionada é muito grande. Escolha uma foto de até 5MB.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // Preview temporário local
     const localUrl = URL.createObjectURL(file);
     setPreviewUrl(localUrl);
-
     setUploadingImage(true);
+
     try {
-      const timestamp = Date.now();
-      const ext = file.name.split(".").pop();
-      const fileName = `produto-${timestamp}.${ext}`;
-      const url = await uploadProductImage(file, fileName);
-      if (url) {
-        setForm((prev) => ({ ...prev, fotoUrl: url }));
-        setPreviewUrl(url);
-      }
-    } catch (error) {
-      console.error("Erro no upload:", error);
+      const url = await uploadProductImage(file);
+      setForm((prev) => ({ ...prev, fotoUrl: url }));
+      setPreviewUrl(url);
+    } catch (error: unknown) {
+      console.error("Erro no upload da foto:", error);
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      alert(`Falha ao enviar a foto: ${msg}`);
+      // Reverte o preview para o estado salvo anteriormente para evitar salvar foto inexistente
+      setPreviewUrl(form.fotoUrl || editingProduto?.fotoUrl || "");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } finally {
       setUploadingImage(false);
     }
   };
 
+  const handleRemoveImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPreviewUrl("");
+    setForm((prev) => ({ ...prev, fotoUrl: "" }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSave = async () => {
+    if (uploadingImage) {
+      alert("Aguarde a conclusão do upload da imagem antes de salvar.");
+      return;
+    }
+
     if (!form.nome || !form.categoria || !form.precoCusto || !form.precoVenda) {
       alert("Preencha todos os campos obrigatórios");
       return;
@@ -262,7 +280,7 @@ export default function CatalogoPage() {
         precoCusto: parseFloat(form.precoCusto),
         precoVenda: parseFloat(form.precoVenda),
         quantidade: form.quantidade !== "" && !isNaN(parseInt(form.quantidade)) ? Math.max(0, parseInt(form.quantidade)) : 1,
-        fotoUrl: form.fotoUrl || undefined,
+        fotoUrl: form.fotoUrl || null,
         status: form.status,
         localizacao: form.localizacao,
       };
@@ -599,18 +617,36 @@ export default function CatalogoPage() {
         <div className="p-5 space-y-5">
           {/* Image Upload */}
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-2">Foto da Peça</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-stone-700">Foto da Peça</label>
+              {previewUrl && !uploadingImage && (
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Remover foto
+                </button>
+              )}
+            </div>
             <div
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !uploadingImage && fileInputRef.current?.click()}
               className="relative aspect-video max-h-48 rounded-2xl border-2 border-dashed border-stone-200 hover:border-gold-400 bg-stone-50 hover:bg-gold-50/30 transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden group"
             >
               {previewUrl ? (
                 <>
                   <Image src={previewUrl} alt="Preview" fill className="object-cover" />
-                  <div className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Camera className="w-5 h-5 text-white" />
-                    <span className="text-white text-xs font-semibold">Trocar foto</span>
-                  </div>
+                  {uploadingImage ? (
+                    <div className="absolute inset-0 bg-stone-900/60 flex items-center justify-center">
+                      <LoadingSpinner label="Enviando imagem..." />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <Camera className="w-5 h-5 text-white" />
+                      <span className="text-white text-xs font-semibold">Trocar foto</span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -631,9 +667,10 @@ export default function CatalogoPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               className="hidden"
               onChange={handleImageUpload}
+              disabled={uploadingImage}
             />
           </div>
 
